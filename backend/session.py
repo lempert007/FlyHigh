@@ -64,6 +64,8 @@ class LastPlanData:
     no_terrain_mask: np.ndarray | None = None  # True where terrain data was NaN (skip safety check)
     zip_bytes: bytes | None = None  # full plan ZIP for patching on altitude edit
     poi_bands_list: list[dict] | None = None  # POI AGL band overrides for the altitude editor
+    bubble_peak_terrain: np.ndarray | None = None  # peak terrain in safety disc at each route point
+    camera_min_terrain: np.ndarray | None = None  # min terrain in camera disc at each route point
 
 
 @dataclass

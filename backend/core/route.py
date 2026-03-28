@@ -297,6 +297,7 @@ def plan_route(mission: MissionInput) -> MissionResult:
     )
 
     # ── Step 5: 3-D altitude profile ──────────────────────────────────────────
+    bubble_terrain = mission.bubble_terrain if mission.bubble_terrain is not None else dsm
     altitude_result = plan_altitude_profile(
         waypoints_2d=waypoints_2d,
         waypoint_actions=actions,
@@ -304,6 +305,7 @@ def plan_route(mission: MissionInput) -> MissionResult:
         poi_zones=ordered_zones,
         global_band=global_band,
         params=params,
+        bubble_terrain=bubble_terrain,
     )
     key_wps = altitude_result.key_waypoints_3d
     altitude_violations = altitude_result.violations
@@ -329,7 +331,6 @@ def plan_route(mission: MissionInput) -> MissionResult:
 
     # ── Step 8: Safety checks ─────────────────────────────────────────────────
     dense_utm = np.array([list(utm.from_latlon(w.lat, w.lon)[:2]) for w in dense_wps])
-    bubble_terrain = mission.bubble_terrain if mission.bubble_terrain is not None else dsm
     camera_terrain = mission.camera_terrain if mission.camera_terrain is not None else dsm
     safety_violations = check_route_safety(
         dense_wps,

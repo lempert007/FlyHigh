@@ -52,7 +52,9 @@ class TerrainIndex:
 
     def _sample_utm(self, utm_points: np.ndarray) -> np.ndarray:
         """Query the interpolator at (N,2) [easting, northing] points."""
-        query = np.column_stack([utm_points[:, 1], utm_points[:, 0]])  # (N, easting)→(northing, easting)
+        query = np.column_stack(
+            [utm_points[:, 1], utm_points[:, 0]]
+        )  # (N, easting)→(northing, easting)
         return self._interp(query)
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -111,6 +113,117 @@ class TerrainIndex:
         """Return the maximum terrain MSL elevation along the segment."""
         return self.sample_leg(start, end, spacing_m).peak_elevation_msl()
 
+    def disc_peak_at(self, point: LatLon, radius_m: float) -> float:
+        """Peak terrain elevation within a disc of radius_m centered at point.
+
+        Samples the center plus one ring of BUBBLE_SAMPLE_COUNT azimuth points at
+        the boundary.  Returns NaN only when all samples are outside the raster.
+        Used to match the disc-based safety check semantics for single-point queries.
+        """
+        e, n = self._to_utm(point)
+        n_az = config.BUBBLE_SAMPLE_COUNT
+        angles = np.linspace(0.0, 2 * np.pi, n_az, endpoint=False)
+        ring_e = e + radius_m * np.cos(angles)
+        ring_n = n + radius_m * np.sin(angles)
+        all_e = np.concatenate([[e], ring_e])
+        all_n = np.concatenate([[n], ring_n])
+        pts = np.column_stack([all_e, all_n])
+        elev = self._sample_utm(pts)
+        return float(np.nanmax(elev)) if not np.all(np.isnan(elev)) else math.nan
+
+    def sample_ribbon(
+        self,
+        start: LatLon,
+        end: LatLon,
+        spacing_m: float,
+        half_width_m: float,
+    ) -> TerrainProfile:
+        """Sample terrain along a ribbon, returning the max elevation at each sample position.
+
+        Samples 7 directions at each position: 5 lateral (center, ±R/2, ±R perpendicular)
+        plus 2 forward (R/2 and R ahead along the path direction).  The forward samples
+        are critical for approaches to hills — they capture terrain the safety-disc
+        "sees ahead" before the drone arrives, so ramp pins are inserted at the
+        correct altitude instead of reacting too late.
+        """
+        se, sn = self._to_utm(start)
+        ee, en = self._to_utm(end)
+        de, dn = ee - se, en - sn
+        leg_len = math.hypot(de, dn)
+
+        if leg_len < 1e-6 or half_width_m < 1e-6:
+            return self.sample_leg(start, end, spacing_m)
+
+        n_pts = max(2, math.ceil(leg_len / spacing_m) + 1)
+        dists = np.linspace(0.0, leg_len, n_pts)
+        ts = dists / leg_len
+        center_e = se + ts * de
+        center_n = sn + ts * dn
+
+        # Perpendicular unit vector (rotate 90°)
+        perp_e = -dn / leg_len
+        perp_n = de / leg_len
+        # Forward unit vector (along path)
+        fwd_e = de / leg_len
+        fwd_n = dn / leg_len
+
+        # (perp_scale, fwd_scale) — each multiplied by half_width_m
+        directions = [
+            (0.0, 0.0),  # center
+            (1.0, 0.0),  # right
+            (-1.0, 0.0),  # left
+            (0.5, 0.0),  # right half
+            (-0.5, 0.0),  # left half
+            (0.0, 1.0),  # ahead full  ← catches hill-approach violations
+            (0.0, 0.5),  # ahead half
+        ]
+        all_pts = []
+        for ps, fs in directions:
+            all_pts.append(
+                np.column_stack(
+                    [
+                        center_e + ps * perp_e * half_width_m + fs * fwd_e * half_width_m,
+                        center_n + ps * perp_n * half_width_m + fs * fwd_n * half_width_m,
+                    ]
+                )
+            )
+        pts = np.vstack(all_pts)  # (7 * n_pts, 2)
+        all_elevs = self._sample_utm(pts)  # (7 * n_pts,)
+
+        elev_mat = all_elevs.reshape(len(directions), n_pts)
+        elev_vals = np.nanmax(elev_mat, axis=0)
+
+        nan_mask = np.isnan(elev_vals)
+        if nan_mask.any():
+            valid = elev_vals[~nan_mask]
+            safe_fill = float(valid.max()) + config.DEFAULT_MAX_AGL_M if len(valid) > 0 else 0.0
+            elev_vals = np.where(nan_mask, safe_fill, elev_vals)
+
+        return TerrainProfile(
+            samples=[
+                TerrainSample(distance_m=float(d), elevation_msl=float(e))
+                for d, e in zip(dists, elev_vals)
+            ]
+        )
+
+    def sample_ribbon_peak(
+        self,
+        start: LatLon,
+        end: LatLon,
+        spacing_m: float,
+        half_width_m: float,
+    ) -> float:
+        """Peak terrain elevation over the ribbon of half_width_m around start→end.
+
+        Delegates to sample_ribbon() so both methods share identical sampling geometry.
+        Returns the global nanmax, or NaN when all samples fall outside the raster.
+        """
+        profile = self.sample_ribbon(start, end, spacing_m, half_width_m)
+        if not profile.samples:
+            return math.nan
+        peak = max(s.elevation_msl for s in profile.samples)
+        return peak if not math.isnan(peak) else math.nan
+
     def sample_points(self, utm_points: np.ndarray) -> np.ndarray:
         """Sample terrain elevation at an array of (N, 2) UTM points.
 
@@ -120,6 +233,7 @@ class TerrainIndex:
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
+
 
 def build_terrain_index(dataset: rasterio.DatasetReader) -> TerrainIndex:
     """Reproject a raster to its natural UTM zone and build a TerrainIndex.
@@ -131,6 +245,7 @@ def build_terrain_index(dataset: rasterio.DatasetReader) -> TerrainIndex:
 
 
 # ── Low-level raster helpers (kept for backward compatibility) ─────────────────
+
 
 def load_tiff(path: str) -> rasterio.DatasetReader:
     """Open a GeoTIFF and return its DatasetReader."""
@@ -167,9 +282,14 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
     dst_crs = rasterio.crs.CRS.from_epsg(utm_epsg)
 
     transform, width, height = rasterio.warp.calculate_default_transform(
-        src_crs, dst_crs, ds.width, ds.height,
-        left=ds.bounds.left, bottom=ds.bounds.bottom,
-        right=ds.bounds.right, top=ds.bounds.top,
+        src_crs,
+        dst_crs,
+        ds.width,
+        ds.height,
+        left=ds.bounds.left,
+        bottom=ds.bounds.bottom,
+        right=ds.bounds.right,
+        top=ds.bounds.top,
     )
 
     destination = np.empty((height, width), dtype=np.float64)
@@ -229,7 +349,8 @@ def extract_file_info(
 
     if not src_crs.is_geographic:
         lons, lats = rasterio.warp.transform(
-            src_crs, "EPSG:4326",
+            src_crs,
+            "EPSG:4326",
             [bounds.left, bounds.right, bounds.left, bounds.right],
             [bounds.bottom, bounds.bottom, bounds.top, bounds.top],
         )

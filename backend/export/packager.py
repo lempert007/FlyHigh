@@ -9,7 +9,14 @@ import zipfile
 
 # Files that are internal to the altitude editor and should not appear in the
 # user-facing download ZIP.
-_INTERNAL_FILES = frozenset({"poi_bands.json", "waypoint_indices.json"})
+_INTERNAL_FILES = frozenset(
+    {
+        "poi_bands.json",
+        "waypoint_indices.json",
+        "bubble_peak_terrain.json",
+        "camera_min_terrain.json",
+    }
+)
 
 
 def build_zip(
@@ -21,6 +28,8 @@ def build_zip(
     poi_bands_json: str | None = None,
     waypoint_indices_json: str | None = None,
     meta_json: str | None = None,
+    bubble_peak_terrain_json: str | None = None,
+    camera_min_terrain_json: str | None = None,
 ) -> io.BytesIO:
     """Create an in-memory ZIP containing the mission output files.
 
@@ -51,6 +60,10 @@ def build_zip(
             zf.writestr("poi_bands.json", poi_bands_json.encode("utf-8"))
         if waypoint_indices_json is not None:
             zf.writestr("waypoint_indices.json", waypoint_indices_json.encode("utf-8"))
+        if bubble_peak_terrain_json is not None:
+            zf.writestr("bubble_peak_terrain.json", bubble_peak_terrain_json.encode("utf-8"))
+        if camera_min_terrain_json is not None:
+            zf.writestr("camera_min_terrain.json", camera_min_terrain_json.encode("utf-8"))
     buf.seek(0)
     return buf
 
@@ -58,8 +71,10 @@ def build_zip(
 def strip_internal_files(zip_bytes: bytes) -> bytes:
     """Return a copy of zip_bytes with internal editor files removed."""
     out = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as src, \
-         zipfile.ZipFile(out, mode="w", compression=zipfile.ZIP_DEFLATED) as dst:
+    with (
+        zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as src,
+        zipfile.ZipFile(out, mode="w", compression=zipfile.ZIP_DEFLATED) as dst,
+    ):
         for name in src.namelist():
             if name not in _INTERNAL_FILES:
                 dst.writestr(name, src.read(name))

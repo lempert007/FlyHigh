@@ -41,6 +41,7 @@ from core.route import (
     detect_mission_zone,
     plan_route,
 )
+from core.safety import compute_profile_bands
 from core.terrain import TerrainIndex, build_terrain_index
 from core.types import (
     AltitudeBand,
@@ -406,6 +407,15 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         # ── 20. Cumulative energy for profile ─────────────────────────────────
         cum_energy = cumulative_energy_wh(dense_utm, final_alts, params)
 
+        bubble_peak_terrain, camera_min_terrain = compute_profile_bands(
+            dense_utm, terrain_elevs, bubble_terrain, camera_terrain, params
+        )
+
+        poi_scan_areas = [
+            (float(cum_dists[s]), float(cum_dists[min(e, n_dense - 1)]))
+            for s, e in zip(poi_indices or [], poi_end_indices or [])
+        ]
+
         profile_html = render_profile_html(
             dense_utm,
             final_alts,
@@ -415,8 +425,11 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             poi_distances=poi_distances or None,
             return_home_distance=return_home_dist,
             poi_band_overrides=poi_band_overrides or None,
+            poi_scan_areas=poi_scan_areas or None,
             cumulative_energy_wh=cum_energy,
             violation_points=[(v.point_index, v.category) for v in violations_info] or None,
+            bubble_peak_terrain=bubble_peak_terrain,
+            camera_min_terrain=camera_min_terrain,
         )
 
         # ── 21. Smart Route diff (optional) ───────────────────────────────────
@@ -481,6 +494,13 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             json.dumps(waypoint_indices) if waypoint_indices else None
         )
 
+        bubble_peak_terrain_json_str = json.dumps(
+            [round(float(v), 2) for v in bubble_peak_terrain.tolist()]
+        )
+        camera_min_terrain_json_str = json.dumps(
+            [round(float(v), 2) for v in camera_min_terrain.tolist()]
+        )
+
         zip_buf = build_zip(
             wp_json_str,
             combined_html,
@@ -490,6 +510,8 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             poi_bands_json=poi_bands_json_str,
             waypoint_indices_json=waypoint_indices_json_str,
             meta_json=meta.model_dump_json(),
+            bubble_peak_terrain_json=bubble_peak_terrain_json_str,
+            camera_min_terrain_json=camera_min_terrain_json_str,
         )
 
         # ── 24. Store plan data for on-demand PDF generation ──────────────────
@@ -551,6 +573,8 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 no_terrain_mask=nan_mask,
                 zip_bytes=zip_buf.getvalue(),
                 poi_bands_list=json.loads(poi_bands_json_str) if poi_bands_json_str else None,
+                bubble_peak_terrain=bubble_peak_terrain,
+                camera_min_terrain=camera_min_terrain,
             ),
         )
 

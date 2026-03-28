@@ -29,6 +29,8 @@ export interface AltEditorData {
   cumDists: number[];
   poiBands: PoiBand[]; // per-POI AGL band overrides (may be empty)
   waypointIndices?: number[]; // dense-array indices for user-placed waypoints
+  bubblePeakTerrain?: number[]; // peak terrain within safety bubble disc at each point
+  cameraMinTerrain?: number[]; // min terrain within camera range disc at each point
 }
 
 export interface UseAltitudeEditorReturn {
@@ -95,12 +97,22 @@ export function useAltitudeEditor(
 
         const poiBands: PoiBand[] = data.poi_bands ?? [];
         const waypointIndices: number[] | undefined = data.waypoint_indices ?? undefined;
+        const bubblePeakTerrain: number[] | undefined = data.bubble_peak_terrain ?? undefined;
+        const cameraMinTerrain: number[] | undefined = data.camera_min_terrain ?? undefined;
         const terrain = wps.map((w, i) => w.alt_m - aglProfile[i]);
         const cumDists = buildCumDists(wps);
         const initialNodes = buildNodes(wps, cumDists, waypointIndices);
 
         if (!cancelled) {
-          setEditorData({ wps, terrain, cumDists, poiBands, waypointIndices });
+          setEditorData({
+            wps,
+            terrain,
+            cumDists,
+            poiBands,
+            waypointIndices,
+            bubblePeakTerrain,
+            cameraMinTerrain,
+          });
           setNodes(initialNodes);
           setInsertCount(0);
           setLoading(false);
@@ -131,7 +143,15 @@ export function useAltitudeEditor(
     : [];
 
   const { minBand, maxBand } = editorData
-    ? buildAglBands(editorData.cumDists, minAgl, maxAgl, editorData.poiBands)
+    ? buildAglBands(
+        editorData.cumDists,
+        editorData.terrain,
+        minAgl,
+        maxAgl,
+        editorData.poiBands,
+        editorData.bubblePeakTerrain,
+        editorData.cameraMinTerrain
+      )
     : { minBand: [] as number[], maxBand: [] as number[] };
 
   const validation: ValidationStatus[] = editorData
