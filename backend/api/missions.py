@@ -138,11 +138,23 @@ async def get_mission_editor_data(folder: str) -> dict:
                 if "waypoint_indices.json" in names
                 else None
             )
+            bubble_peak = (
+                json.loads(zf.read("bubble_peak_terrain.json"))
+                if "bubble_peak_terrain.json" in names
+                else None
+            )
+            camera_min = (
+                json.loads(zf.read("camera_min_terrain.json"))
+                if "camera_min_terrain.json" in names
+                else None
+            )
         return {
             "waypoints": wps,
             "agl_profile": agl,
             "poi_bands": poi_bands,
             "waypoint_indices": wp_indices,
+            "bubble_peak_terrain": bubble_peak,
+            "camera_min_terrain": camera_min,
         }
     except KeyError:
         raise HTTPException(409, "Plan ZIP is missing required files — re-plan the route.")

@@ -182,6 +182,8 @@ export async function fetchEditorData(sessionId: string): Promise<{
   agl_profile: number[];
   poi_bands: Array<{ start_m: number; end_m: number; min_agl_m: number; max_agl_m: number }> | null;
   waypoint_indices: number[] | null;
+  bubble_peak_terrain: number[] | null;
+  camera_min_terrain: number[] | null;
 }> {
   const res = await fetch(`/plan/${sessionId}/editor-data`);
   if (!res.ok) {
@@ -255,6 +257,8 @@ export async function fetchFolderEditorData(folder: string): Promise<{
   agl_profile: number[];
   poi_bands: Array<{ start_m: number; end_m: number; min_agl_m: number; max_agl_m: number }> | null;
   waypoint_indices: number[] | null;
+  bubble_peak_terrain: number[] | null;
+  camera_min_terrain: number[] | null;
 }> {
   const res = await fetch(`/missions/${encodeURIComponent(folder)}/editor-data`);
   if (!res.ok) {

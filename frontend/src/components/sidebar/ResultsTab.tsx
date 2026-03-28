@@ -75,27 +75,6 @@ export function ResultsTab({
         sx={{ display: "flex", flexDirection: "column", flex: 1, gap: 2, pt: 1 }}
         data-tutorial="plan-button"
       >
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1,
-            opacity: 0.45,
-            mb: 1,
-          }}
-        >
-          <Typography
-            variant="body2"
-            color="text.disabled"
-            textAlign="center"
-            sx={{ fontSize: "0.8rem" }}
-          >
-            Set up your mission in the Mission tab,
-            <br />
-            then plan your route here.
-          </Typography>
-        </Box>
         {!isConfigValid && (
           <Typography
             variant="caption"

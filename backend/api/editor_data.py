@@ -30,6 +30,16 @@ async def get_editor_data(session_id: str) -> dict:
     return {
         "waypoints": data.waypoints_list,
         "agl_profile": [round(float(v), 2) for v in data.agl_arr],
-        "poi_bands": data.poi_bands_list,          # None if no POI overrides
+        "poi_bands": data.poi_bands_list,
         "waypoint_indices": data.waypoint_indices,
+        "bubble_peak_terrain": (
+            [round(float(v), 2) for v in data.bubble_peak_terrain]
+            if data.bubble_peak_terrain is not None
+            else None
+        ),
+        "camera_min_terrain": (
+            [round(float(v), 2) for v in data.camera_min_terrain]
+            if data.camera_min_terrain is not None
+            else None
+        ),
     }

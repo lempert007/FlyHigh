@@ -99,7 +99,13 @@ from -SMART_ROUTE_CORRIDOR_M to +SMART_ROUTE_CORRIDOR_M."""
 
 # ── Safety check ─────────────────────────────────────────────────────────────
 BUBBLE_SAMPLE_COUNT: int = 36
-"""Number of azimuth samples used when checking the horizontal safety bubble."""
+"""Number of azimuth samples per ring when checking the horizontal safety bubble."""
+
+BUBBLE_RING_COUNT: int = 3
+"""Number of concentric rings sampled inside the safety bubble disc.
+Rings are spaced evenly from radius/K to radius. A center-point sample is
+always added, giving BUBBLE_RING_COUNT * BUBBLE_SAMPLE_COUNT + 1 terrain
+queries per route point."""
 
 # ── Warnings / errors ────────────────────────────────────────────────────────
 BATTERY_WARNING_PCT: float = 90.0

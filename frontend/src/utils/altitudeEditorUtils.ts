@@ -56,23 +56,42 @@ export function buildCumDists(wps: WpPoint[]): number[] {
 // ── Per-point AGL band ────────────────────────────────────────────────────────
 
 /**
- * Build per-point min/max AGL arrays from the global defaults and optional
- * POI-specific overrides. Points inside a POI band range use that band's values.
+ * Build per-point min/max AGL band arrays (as AGL offsets above terrain[i]).
+ *
+ * When bubblePeakTerrain / cameraMinTerrain are provided, the floor/ceiling
+ * reference shifts from the terrain directly below to the worst-case terrain
+ * within the safety/camera disc — matching the backend's safety semantics.
+ *
+ * The returned values are still AGL offsets above terrain[i] so the chart
+ * (which renders terrain[i] + minBand[i]) and validation (which computes
+ * alt - terrain[i] vs minBand[i]) work without changes.
  */
 export function buildAglBands(
   cumDists: number[],
+  terrain: number[],
   globalMin: number,
   globalMax: number,
-  poiBands: PoiBand[]
+  poiBands: PoiBand[],
+  bubblePeakTerrain?: number[] | null,
+  cameraMinTerrain?: number[] | null
 ): { minBand: number[]; maxBand: number[] } {
-  const minBand = new Array<number>(cumDists.length).fill(globalMin);
-  const maxBand = new Array<number>(cumDists.length).fill(globalMax);
+  const minBand = new Array<number>(cumDists.length);
+  const maxBand = new Array<number>(cumDists.length);
+
+  for (let i = 0; i < cumDists.length; i++) {
+    const floorRef = bubblePeakTerrain ? bubblePeakTerrain[i] : terrain[i];
+    const ceilRef = cameraMinTerrain ? cameraMinTerrain[i] : terrain[i];
+    minBand[i] = floorRef - terrain[i] + globalMin;
+    maxBand[i] = ceilRef - terrain[i] + globalMax;
+  }
 
   for (const pb of poiBands) {
     for (let i = 0; i < cumDists.length; i++) {
       if (cumDists[i] >= pb.start_m && cumDists[i] <= pb.end_m) {
-        minBand[i] = pb.min_agl_m;
-        maxBand[i] = pb.max_agl_m;
+        const floorRef = bubblePeakTerrain ? bubblePeakTerrain[i] : terrain[i];
+        const ceilRef = cameraMinTerrain ? cameraMinTerrain[i] : terrain[i];
+        minBand[i] = floorRef - terrain[i] + pb.min_agl_m;
+        maxBand[i] = ceilRef - terrain[i] + pb.max_agl_m;
       }
     }
   }
