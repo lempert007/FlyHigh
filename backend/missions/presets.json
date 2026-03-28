@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Drone 1 - best drone",
+    "cruise_speed_ms": 15.0,
+    "climb_rate_ms": 3.0,
+    "battery_wh": 600.0,
+    "drone_weight_kg": 6.0
+  },
+  {
+    "name": "Drone 2",
+    "cruise_speed_ms": 15.0,
+    "climb_rate_ms": 6.0,
+    "battery_wh": 1550.0,
+    "drone_weight_kg": 2.5
+  },
+  {
+    "name": "Fixed Wing 1",
+    "cruise_speed_ms": 25.0,
+    "climb_rate_ms": 4.0,
+    "battery_wh": 300.0,
+    "drone_weight_kg": 1.5
+  }
+]

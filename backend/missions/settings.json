@@ -1,0 +1,7 @@
+{
+  "default_min_agl_m": 80.0,
+  "default_max_agl_m": 150.0,
+  "default_spacing_m": 10.0,
+  "battery_warning_pct": 50.0,
+  "battery_error_pct": 90.0
+}

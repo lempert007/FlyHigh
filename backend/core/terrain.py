@@ -1,0 +1,256 @@
+"""
+GeoTIFF loading and UTM terrain interpolation.
+
+The public surface is the TerrainIndex class — all callers pass LatLon coordinates;
+UTM conversion is fully internal. The module-level helpers (load_tiff, extract_file_info)
+are unchanged and still used by the upload API.
+"""
+
+from __future__ import annotations
+
+import logging
+import math
+import os
+from typing import Literal
+
+import numpy as np
+import rasterio
+import rasterio.crs
+import rasterio.warp
+import utm
+from scipy.interpolate import RegularGridInterpolator
+
+import config
+from core.types import LatLon, TerrainProfile, TerrainSample
+from models import FileInfo
+
+logger = logging.getLogger(__name__)
+
+
+class TerrainIndex:
+    """Terrain elevation query object backed by a UTM-projected raster.
+
+    All public methods accept WGS84 LatLon inputs; UTM conversion is internal.
+    """
+
+    def __init__(
+        self,
+        interpolator: RegularGridInterpolator,
+        zone_str: str,
+        resolution_m: float,
+    ) -> None:
+        self._interp = interpolator
+        self.zone_str = zone_str
+        self.resolution_m = resolution_m
+
+    # ── Internal UTM helpers ──────────────────────────────────────────────────
+
+    def _to_utm(self, point: LatLon) -> tuple[float, float]:
+        """Convert a LatLon to (easting, northing) in this index's UTM zone."""
+        e, n, _, _ = utm.from_latlon(point.lat, point.lon)
+        return e, n
+
+    def _sample_utm(self, utm_points: np.ndarray) -> np.ndarray:
+        """Query the interpolator at (N,2) [easting, northing] points."""
+        query = np.column_stack([utm_points[:, 1], utm_points[:, 0]])  # (N, easting)→(northing, easting)
+        return self._interp(query)
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def elevation_at(self, point: LatLon) -> float:
+        """Return terrain MSL elevation at a geographic point.
+
+        NaN is returned (not raised) for points outside the raster extent —
+        callers must decide how to handle missing data.
+        """
+        e, n = self._to_utm(point)
+        result = self._sample_utm(np.array([[e, n]]))
+        return float(result[0])
+
+    def sample_leg(self, start: LatLon, end: LatLon, spacing_m: float) -> TerrainProfile:
+        """Densely sample terrain elevations along the straight segment start→end.
+
+        Returns one sample at distance 0, then every spacing_m, then one at the
+        full leg length. This is the foundation for all leg-level terrain analysis.
+        """
+        se, sn = self._to_utm(start)
+        ee, en = self._to_utm(end)
+
+        de = ee - se
+        dn = en - sn
+        leg_len = math.hypot(de, dn)
+
+        if leg_len < 1e-6:
+            elev = float(self._sample_utm(np.array([[se, sn]]))[0])
+            if math.isnan(elev):
+                elev = 0.0
+            return TerrainProfile(samples=[TerrainSample(distance_m=0.0, elevation_msl=elev)])
+
+        n_pts = max(2, math.ceil(leg_len / spacing_m) + 1)
+        dists = np.linspace(0.0, leg_len, n_pts)
+
+        east_vals = se + de * (dists / leg_len)
+        north_vals = sn + dn * (dists / leg_len)
+        utm_pts = np.column_stack([east_vals, north_vals])
+        elev_vals = self._sample_utm(utm_pts)
+
+        # Replace NaN with safe fallback: max valid elevation + max_agl
+        nan_mask = np.isnan(elev_vals)
+        if nan_mask.any():
+            valid = elev_vals[~nan_mask]
+            safe_fill = float(valid.max()) + config.DEFAULT_MAX_AGL_M
+            elev_vals = np.where(nan_mask, safe_fill, elev_vals)
+
+        samples = [
+            TerrainSample(distance_m=float(d), elevation_msl=float(e))
+            for d, e in zip(dists, elev_vals)
+        ]
+        return TerrainProfile(samples=samples)
+
+    def peak_elevation_msl(self, start: LatLon, end: LatLon, spacing_m: float) -> float:
+        """Return the maximum terrain MSL elevation along the segment."""
+        return self.sample_leg(start, end, spacing_m).peak_elevation_msl()
+
+    def sample_points(self, utm_points: np.ndarray) -> np.ndarray:
+        """Sample terrain elevation at an array of (N, 2) UTM points.
+
+        Returns an (N,) array of MSL elevations (NaN for out-of-bounds points).
+        """
+        return sample_elevation(self._interp, utm_points)
+
+
+# ── Factory ───────────────────────────────────────────────────────────────────
+
+def build_terrain_index(dataset: rasterio.DatasetReader) -> TerrainIndex:
+    """Reproject a raster to its natural UTM zone and build a TerrainIndex.
+
+    Preserves bilinear resampling and no-data→NaN behaviour.
+    """
+    interpolator, zone_str, resolution_m = reproject_to_utm(dataset)
+    return TerrainIndex(interpolator, zone_str, resolution_m)
+
+
+# ── Low-level raster helpers (kept for backward compatibility) ─────────────────
+
+def load_tiff(path: str) -> rasterio.DatasetReader:
+    """Open a GeoTIFF and return its DatasetReader."""
+    try:
+        ds = rasterio.open(path)
+    except Exception as exc:
+        raise RuntimeError(f"Cannot open GeoTIFF at {path!r}: {exc}") from exc
+    if ds.count < 1:
+        ds.close()
+        raise RuntimeError(f"GeoTIFF at {path!r} has no bands")
+    return ds
+
+
+def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolator, str, float]:
+    """Reproject a raster to its natural UTM zone and build a terrain interpolator.
+
+    Returns:
+        interpolator: RegularGridInterpolator in (northing, easting) order
+        zone_str: UTM zone string e.g. "32N"
+        resolution_m: conservative pixel size (max of x/y pixel dimensions)
+    """
+    centre_lon = (ds.bounds.left + ds.bounds.right) / 2
+    centre_lat = (ds.bounds.top + ds.bounds.bottom) / 2
+
+    src_crs = ds.crs
+    if not src_crs.is_geographic:
+        xs, ys = rasterio.warp.transform(src_crs, "EPSG:4326", [centre_lon], [centre_lat])
+        centre_lon, centre_lat = xs[0], ys[0]
+
+    _, _, zone_number, zone_letter = utm.from_latlon(centre_lat, centre_lon)
+    zone_str = f"{zone_number}{zone_letter}"
+    northern = zone_letter >= "N"
+    utm_epsg = 32600 + zone_number if northern else 32700 + zone_number
+    dst_crs = rasterio.crs.CRS.from_epsg(utm_epsg)
+
+    transform, width, height = rasterio.warp.calculate_default_transform(
+        src_crs, dst_crs, ds.width, ds.height,
+        left=ds.bounds.left, bottom=ds.bounds.bottom,
+        right=ds.bounds.right, top=ds.bounds.top,
+    )
+
+    destination = np.empty((height, width), dtype=np.float64)
+    nodata_val = ds.nodata if ds.nodata is not None else config.NODATA_FILL
+    rasterio.warp.reproject(
+        source=rasterio.band(ds, 1),
+        destination=destination,
+        src_transform=ds.transform,
+        src_crs=src_crs,
+        dst_transform=transform,
+        dst_crs=dst_crs,
+        resampling=rasterio.warp.Resampling.bilinear,
+        src_nodata=ds.nodata,
+        dst_nodata=nodata_val,
+    )
+
+    if ds.nodata is not None:
+        destination[destination == ds.nodata] = np.nan
+
+    pixel_size_e = abs(transform.a)
+    pixel_size_n = abs(transform.e)
+    origin_e = transform.c + pixel_size_e * 0.5
+    origin_n = transform.f - pixel_size_n * 0.5
+
+    e_axis = origin_e + np.arange(width) * pixel_size_e
+    n_axis = origin_n - np.arange(height) * pixel_size_n
+    n_axis_sorted = n_axis[::-1]
+    elev_grid = destination[::-1, :]
+
+    interpolator = RegularGridInterpolator(
+        (n_axis_sorted, e_axis),
+        elev_grid,
+        method="linear",
+        bounds_error=False,
+        fill_value=np.nan,
+    )
+    resolution_m = float(max(abs(transform.a), abs(transform.e)))
+    return interpolator, zone_str, resolution_m
+
+
+def sample_elevation(
+    interpolator: RegularGridInterpolator,
+    utm_points: np.ndarray,
+) -> np.ndarray:
+    """Sample elevation values at N UTM points (shape N,2 [easting, northing])."""
+    query = np.column_stack([utm_points[:, 1], utm_points[:, 0]])
+    return interpolator(query)
+
+
+def extract_file_info(
+    ds: rasterio.DatasetReader,
+    inferred_type: Literal["DSM", "DTM", "unknown"],
+) -> FileInfo:
+    """Build a FileInfo from an open rasterio DatasetReader."""
+    src_crs = ds.crs
+    bounds = ds.bounds
+
+    if not src_crs.is_geographic:
+        lons, lats = rasterio.warp.transform(
+            src_crs, "EPSG:4326",
+            [bounds.left, bounds.right, bounds.left, bounds.right],
+            [bounds.bottom, bounds.bottom, bounds.top, bounds.top],
+        )
+        west = min(lons)
+        east = max(lons)
+        south = min(lats)
+        north = max(lats)
+    else:
+        west, south, east, north = bounds.left, bounds.bottom, bounds.right, bounds.top
+
+    res_x, res_y = ds.res
+    if src_crs.is_geographic:
+        centre_lat = (south + north) / 2
+        res_m = (res_x + res_y) / 2 * 111_320.0 * abs(np.cos(np.radians(centre_lat)))
+    else:
+        res_m = (res_x + res_y) / 2
+
+    return FileInfo(
+        name=os.path.basename(ds.name),
+        resolution_m=round(res_m, 2),
+        bbox=(west, south, east, north),
+        crs=src_crs.to_string(),
+        inferred_type=inferred_type,
+    )

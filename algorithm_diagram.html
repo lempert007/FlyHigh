@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FlyHigh — Altitude Algorithm Explained</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #0d1117;
+    color: #c9d1d9;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    padding: 40px 32px 60px;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.55rem; font-weight: 700; color: #e6edf3; margin-bottom: 4px; }
+  .subtitle { font-size: 0.9rem; color: #8b949e; margin-bottom: 36px; }
+
+  /* ── Profile illustration ─────────────────────────────────── */
+  .profile-wrap {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 24px 24px 16px;
+    margin-bottom: 40px;
+  }
+  .profile-wrap h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #8b949e; margin-bottom: 14px; }
+  .profile-wrap svg { display: block; width: 100%; }
+
+  /* ── Legend ──────────────────────────────────────────────── */
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    margin-top: 14px;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; color: #8b949e;
+  }
+  .leg-line { width: 28px; height: 3px; border-radius: 2px; }
+  .leg-dash { width: 28px; height: 0; border-top: 2px dashed; }
+
+  /* ── Steps grid ──────────────────────────────────────────── */
+  .steps-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #8b949e; margin-bottom: 18px; }
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 700px) { .steps { grid-template-columns: 1fr; } }
+
+  .step {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    padding: 16px;
+    position: relative;
+  }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    font-size: 0.78rem; font-weight: 700;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .step-title { font-size: 0.88rem; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+  .step-body { font-size: 0.78rem; color: #8b949e; line-height: 1.55; }
+  .step-body b { color: #c9d1d9; }
+  .step-tag {
+    display: inline-block; font-size: 0.65rem; font-weight: 600;
+    padding: 1px 6px; border-radius: 4px; margin-top: 8px;
+  }
+
+  /* Phase colours */
+  .phase-prep   { background:#1c2a3a; color:#58a6ff; border: 1px solid #1f6feb; }
+  .phase-plan   { background:#1e2a1e; color:#3fb950; border: 1px solid #238636; }
+  .phase-select { background:#2a1e1e; color:#f78166; border: 1px solid #b22222; }
+  .phase-build  { background:#2a241a; color:#e3b341; border: 1px solid #9e6a03; }
+  .phase-check  { background:#21193a; color:#bc8cff; border: 1px solid #6e40c9; }
+
+  .num-prep   { background:#1f6feb22; color:#58a6ff; border: 1px solid #1f6feb; }
+  .num-plan   { background:#23863622; color:#3fb950; border: 1px solid #238636; }
+  .num-select { background:#b2222222; color:#f78166; border: 1px solid #b22222; }
+  .num-build  { background:#9e6a0322; color:#e3b341; border: 1px solid #9e6a03; }
+  .num-check  { background:#6e40c922; color:#bc8cff; border: 1px solid #6e40c9; }
+
+  .divider { height: 1px; background: #21262d; margin: 36px 0; }
+
+  /* Phase legend row */
+  .phases {
+    display: flex; flex-wrap: wrap; gap: 10px;
+    margin-bottom: 24px;
+  }
+  .phase-badge {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px;
+    font-size: 0.75rem; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<h1>How FlyHigh Plans Your Drone's Altitude</h1>
+<p class="subtitle">A plain-English walkthrough of the 9-step altitude algorithm in <code>core/altitude.py</code></p>
+
+<!-- ── Profile Illustration ──────────────────────────────────────────────── -->
+<div class="profile-wrap">
+  <h2>What the algorithm produces</h2>
+
+  <svg viewBox="0 0 900 240" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <!-- Terrain gradient -->
+      <linearGradient id="terrainGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#5a4020" stop-opacity="0.9"/>
+        <stop offset="100%" stop-color="#3a2810" stop-opacity="0.6"/>
+      </linearGradient>
+      <!-- Band fill -->
+      <linearGradient id="bandGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#1E90FF" stop-opacity="0.06"/>
+        <stop offset="100%" stop-color="#1E90FF" stop-opacity="0.14"/>
+      </linearGradient>
+      <!-- Flight path gradient -->
+      <linearGradient id="flightGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#3fb950"/>
+        <stop offset="40%" stop-color="#1E90FF"/>
+        <stop offset="100%" stop-color="#1E90FF"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Y-axis label -->
+    <text x="10" y="120" text-anchor="middle" font-size="10" fill="#555" transform="rotate(-90,10,120)">Altitude (m MSL)</text>
+
+    <!-- Axes -->
+    <line x1="42" y1="12" x2="42" y2="210" stroke="#2d3748" stroke-width="1"/>
+    <line x1="42" y1="210" x2="890" y2="210" stroke="#2d3748" stroke-width="1"/>
+    <text x="460" y="228" text-anchor="middle" font-size="10" fill="#555">Distance along route →</text>
+
+    <!-- ── Terrain ─────────────────────────────────────────── -->
+    <!-- Terrain shape: flat start, hill, valley, second hill, flat end -->
+    <polygon
+      points="42,210 42,170 120,168 200,130 280,155 380,100 460,120 540,145 620,90 700,140 780,160 860,158 860,210"
+      fill="url(#terrainGrad)" stroke="#7a5c30" stroke-width="1.2"/>
+    <text x="200" y="205" text-anchor="middle" font-size="9" fill="#7a5c30">Terrain (ground)</text>
+
+    <!-- ── Min AGL floor (dashed orange) ─────────────────── -->
+    <polyline
+      points="42,140 120,138 200,100 280,125 380,70 460,90 540,115 620,60 700,110 780,130 860,128"
+      fill="none" stroke="#ff9100" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.8"/>
+
+    <!-- ── Max AGL ceiling (dashed red) ──────────────────── -->
+    <polyline
+      points="42,110 120,108 200,70 280,95 380,40 460,60 540,85 620,30 700,80 780,100 860,98"
+      fill="none" stroke="#ff5252" stroke-width="1.2" stroke-dasharray="5,3" opacity="0.6"/>
+
+    <!-- ── AGL band fill ──────────────────────────────────── -->
+    <polygon
+      points="42,140 120,138 200,100 280,125 380,70 460,90 540,115 620,60 700,110 780,130 860,128
+              860,98 780,100 700,80 620,30 540,85 460,60 380,40 280,95 200,70 120,108 42,110"
+      fill="url(#bandGrad)"/>
+
+    <!-- ── Drone flight path ──────────────────────────────── -->
+    <!--
+      Flat at ~125m from start → ramp up → flat at ~80m → ramp down into valley → flat at ~75m →
+      ramp up for hill → flat ~55m → ramp down → flat ~105m back home
+    -->
+    <!-- Segment 1: flat from start (home) -->
+    <line x1="42" y1="125" x2="195" y2="125" stroke="url(#flightGrad)" stroke-width="2.5"/>
+    <!-- Ramp up to clear hill -->
+    <line x1="195" y1="125" x2="310" y2="83" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- Flat over hill -->
+    <line x1="310" y1="83" x2="390" y2="83" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- Ramp down into valley -->
+    <line x1="390" y1="83" x2="470" y2="108" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- POI zone — flat at lower AGL -->
+    <line x1="470" y1="108" x2="580" y2="108" stroke="#ff9100" stroke-width="2.5"/>
+    <!-- Ramp up to clear second hill -->
+    <line x1="580" y1="108" x2="650" y2="50" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- Flat over second hill -->
+    <line x1="650" y1="50" x2="710" y2="50" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- Ramp down to return altitude -->
+    <line x1="710" y1="50" x2="790" y2="122" stroke="#1E90FF" stroke-width="2.5"/>
+    <!-- Flat return home -->
+    <line x1="790" y1="122" x2="860" y2="122" stroke="#3fb950" stroke-width="2.5"/>
+
+    <!-- ── Ramp start markers ─────────────────────────────── -->
+    <circle cx="195" cy="125" r="4" fill="#e3b341" stroke="#0d1117" stroke-width="1.5"/>
+    <circle cx="390" cy="83" r="4" fill="#e3b341" stroke="#0d1117" stroke-width="1.5"/>
+    <circle cx="580" cy="108" r="4" fill="#e3b341" stroke="#0d1117" stroke-width="1.5"/>
+    <circle cx="710" cy="50" r="4" fill="#e3b341" stroke="#0d1117" stroke-width="1.5"/>
+
+    <!-- ── Zone crossing: entering POI zone ──────────────── -->
+    <line x1="460" y1="16" x2="460" y2="210" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4,3" opacity="0.7"/>
+    <text x="462" y="26" font-size="8.5" fill="#bc8cff">zone crossing</text>
+    <!-- POI exit -->
+    <line x1="590" y1="16" x2="590" y2="210" stroke="#bc8cff" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>
+
+    <!-- ── Terrain pin on ramp ────────────────────────────── -->
+    <!-- Small terrain bump mid-ramp between 195 and 310 -->
+    <circle cx="255" cy="104" r="4" fill="#f78166" stroke="#0d1117" stroke-width="1.5"/>
+    <text x="228" y="100" font-size="8" fill="#f78166">terrain pin</text>
+
+    <!-- ── Home / Land markers ────────────────────────────── -->
+    <circle cx="42" cy="125" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1.5"/>
+    <text x="48" y="117" font-size="9" fill="#3fb950" font-weight="bold">H</text>
+    <circle cx="860" cy="122" r="6" fill="#3fb950" stroke="#0d1117" stroke-width="1.5"/>
+    <text x="867" y="114" font-size="9" fill="#3fb950" font-weight="bold">H</text>
+
+    <!-- ── RTH marker ─────────────────────────────────────── -->
+    <line x1="790" y1="16" x2="790" y2="210" stroke="#3fb950" stroke-width="1" stroke-dasharray="4,3" opacity="0.6"/>
+    <text x="793" y="26" font-size="8.5" fill="#3fb950">RTH</text>
+
+    <!-- ── POI zone label ────────────────────────────────── -->
+    <rect x="461" y="152" width="128" height="14" rx="3" fill="#ff910015"/>
+    <text x="525" y="162" text-anchor="middle" font-size="8.5" fill="#ff9100">POI zone (lower AGL)</text>
+
+    <!-- ── Labels: min/max AGL ───────────────────────────── -->
+    <text x="868" y="131" font-size="8.5" fill="#ff9100">min AGL</text>
+    <text x="868" y="101" font-size="8.5" fill="#ff5252">max AGL</text>
+
+    <!-- ── Brace showing "AGL band" ─────────────────────── -->
+    <line x1="76" y1="110" x2="76" y2="140" stroke="#1E90FF" stroke-width="1" opacity="0.5"/>
+    <line x1="73" y1="110" x2="79" y2="110" stroke="#1E90FF" stroke-width="1" opacity="0.5"/>
+    <line x1="73" y1="140" x2="79" y2="140" stroke="#1E90FF" stroke-width="1" opacity="0.5"/>
+    <text x="80" y="128" font-size="8" fill="#1E90FF" opacity="0.8">AGL band</text>
+
+    <!-- ── Ramp label ──────────────────────────────────────── -->
+    <text x="243" y="116" font-size="8.5" fill="#e3b341" transform="rotate(-25, 243, 116)">ramp</text>
+  </svg>
+
+  <div class="legend">
+    <div class="legend-item"><div class="leg-line" style="background:#1E90FF"></div> Drone flight path</div>
+    <div class="legend-item"><div class="leg-line" style="background:#3fb950"></div> Takeoff / Return home</div>
+    <div class="legend-item"><div class="leg-dash" style="border-color:#ff9100"></div> Min AGL floor</div>
+    <div class="legend-item"><div class="leg-dash" style="border-color:#ff5252"></div> Max AGL ceiling</div>
+    <div class="legend-item"><div class="leg-line" style="background:#e3b341; height:2px; border-radius:50%; width:10px; height:10px; border-radius:50%;"></div><span>Ramp start point</span></div>
+    <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#f78166;flex-shrink:0"></div> Terrain pin (ramp safety)</div>
+    <div class="legend-item"><div class="leg-dash" style="border-color:#bc8cff"></div> Zone crossing</div>
+    <div class="legend-item"><div style="width:10px;height:10px;border-radius:50%;background:#3fb950;flex-shrink:0"></div> Home / Land</div>
+  </div>
+</div>
+
+<!-- ── Phase Legend ───────────────────────────────────────────────────────── -->
+<p class="steps-title">The 9 steps — grouped by what they do</p>
+<div class="phases">
+  <span class="phase-badge phase-prep">🛫 Preparation (Steps 1–2)</span>
+  <span class="phase-badge phase-plan">📐 Planning (Step 3–4)</span>
+  <span class="phase-badge phase-select">🎯 Selection (Step 5–6)</span>
+  <span class="phase-badge phase-build">🔧 Build output (Steps 7–8)</span>
+  <span class="phase-badge phase-check">✅ Verification (Step 9)</span>
+</div>
+
+<!-- ── Steps Grid ─────────────────────────────────────────────────────────── -->
+<div class="steps">
+
+  <!-- Step 1 -->
+  <div class="step">
+    <div class="step-num num-prep">1</div>
+    <div class="step-title">Resolve takeoff altitude</div>
+    <div class="step-body">
+      Decide how high the drone is at the moment it takes off.<br><br>
+      If the user pinned a fixed altitude, use that. Otherwise, read the terrain elevation at the home point and add the <b>minimum AGL clearance</b> on top — the lowest safe starting height.
+    </div>
+    <span class="step-tag phase-prep">Preparation</span>
+  </div>
+
+  <!-- Step 2a -->
+  <div class="step">
+    <div class="step-num num-prep">2a</div>
+    <div class="step-title">Insert zone-crossing points</div>
+    <div class="step-body">
+      Each POI area can have its own altitude rules (e.g. "fly lower here"). Whenever the route crosses <b>into or out of a POI zone</b>, a hidden waypoint is inserted at that exact boundary.<br><br>
+      This ensures no single flight leg ever spans two different rule-sets at once.
+    </div>
+    <span class="step-tag phase-prep">Preparation</span>
+  </div>
+
+  <!-- Step 2b -->
+  <div class="step">
+    <div class="step-num num-prep">2b</div>
+    <div class="step-title">Split impossible legs</div>
+    <div class="step-body">
+      Sometimes terrain varies so wildly on one leg that <b>no single flat altitude</b> can satisfy both "stay above the peak" and "stay below the ceiling".<br><br>
+      The leg is split at its midpoint and each half is checked again — up to 3 times (making at most 8 sub-legs). After that a violation is logged.
+    </div>
+    <span class="step-tag phase-prep">Preparation</span>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="step">
+    <div class="step-num num-plan">3</div>
+    <div class="step-title">Compute floor &amp; ceiling per leg</div>
+    <div class="step-body">
+      For each leg the terrain is sampled at 20 m intervals.<br><br>
+      <b>Floor</b> = highest terrain point + min AGL — the drone must be at least this high.<br>
+      <b>Ceiling</b> = lowest terrain point + max AGL — the drone must not exceed this.<br><br>
+      Step 2b guarantees floor ≤ ceiling for every leg.
+    </div>
+    <span class="step-tag phase-plan">Planning</span>
+  </div>
+
+  <!-- Step 4 -->
+  <div class="step">
+    <div class="step-num num-plan">4</div>
+    <div class="step-title">Propagate climb-rate limits</div>
+    <div class="step-body">
+      The drone can't teleport — it climbs and descends at a limited slope. Step 4 runs <b>4 fast passes</b> over the leg list to tighten each leg's allowed altitude range so that every transition is reachable:<br><br>
+      • backward &amp; forward <b>floor</b> passes — "start climbing early enough"<br>
+      • backward &amp; forward <b>ceiling</b> passes — "start descending early enough"
+    </div>
+    <span class="step-tag phase-plan">Planning</span>
+  </div>
+
+  <!-- Step 5 -->
+  <div class="step">
+    <div class="step-num num-select">5</div>
+    <div class="step-title">Select cruise altitude</div>
+    <div class="step-body">
+      A single forward sweep assigns one altitude to each leg. The rule is simple:<br><br>
+      <b>Keep the current altitude unless forced to change.</b><br><br>
+      The drone only climbs when the floor rises above it, and only descends when the ceiling drops below it. Fewer changes = smoother, more efficient flight.
+    </div>
+    <span class="step-tag phase-select">Selection</span>
+  </div>
+
+  <!-- Step 6 -->
+  <div class="step">
+    <div class="step-num num-select">6</div>
+    <div class="step-title">Clamp takeoff altitude</div>
+    <div class="step-body">
+      Now that the first leg's cruise altitude is known, the <b>takeoff altitude</b> from Step 1 is bumped up if it would be too low to reach the first leg's floor in time.<br><br>
+      (Only applies when the user hasn't pinned a fixed takeoff altitude.)
+    </div>
+    <span class="step-tag phase-select">Selection</span>
+  </div>
+
+  <!-- Step 7 -->
+  <div class="step">
+    <div class="step-num num-build">7</div>
+    <div class="step-title">Insert ramp waypoints</div>
+    <div class="step-body">
+      Between any two legs at different altitudes, a <b>ramp start point</b> is inserted within the preceding leg. The drone flies flat, then begins climbing or descending at the exact moment needed to arrive at the new altitude right on time.<br><br>
+      Because Step 4 already guaranteed the slope fits, no backwards walking is required.
+    </div>
+    <span class="step-tag phase-build">Build</span>
+  </div>
+
+  <!-- Step 8 -->
+  <div class="step">
+    <div class="step-num num-build">8</div>
+    <div class="step-title">Terrain pins on ramps</div>
+    <div class="step-body">
+      During a ramp the drone's altitude is interpolated linearly. A hill hidden <b>mid-ramp</b> could be clipped even if the endpoints are fine.<br><br>
+      Step 8 samples every ramp segment and, if the worst clearance violation is found, inserts a <b>terrain pin</b> waypoint there. This repeats until the ramp is clean.
+    </div>
+    <span class="step-tag phase-build">Build</span>
+  </div>
+
+  <!-- Step 9 -->
+  <div class="step">
+    <div class="step-num num-check">9</div>
+    <div class="step-title">Final safety check</div>
+    <div class="step-body">
+      Every segment in the completed route is sampled at 20 m intervals one last time.<br><br>
+      Any point where the drone would be <b>below min AGL</b> is a hard violation.<br>
+      Any point where the drone would be <b>above max AGL</b> is a soft warning.<br><br>
+      Violations are reported in the results panel but never block the download.
+    </div>
+    <span class="step-tag phase-check">Verification</span>
+  </div>
+
+</div>
+
+<div class="divider"></div>
+
+<!-- ── Key guarantee box ──────────────────────────────────────────────────── -->
+<div style="background:#161b22;border:1px solid #238636;border-radius:10px;padding:20px 24px;">
+  <p style="font-size:0.82rem;color:#3fb950;font-weight:700;margin-bottom:10px;">🔒 Key guarantees after all 9 steps</p>
+  <ul style="font-size:0.8rem;color:#8b949e;line-height:1.8;padding-left:18px;">
+    <li>Every <b style="color:#c9d1d9">flat leg</b> is within the min–max AGL band.</li>
+    <li>Every <b style="color:#c9d1d9">altitude transition</b> respects the drone's max climb/descent rate.</li>
+    <li>Every <b style="color:#c9d1d9">ramp segment</b> has at least min AGL clearance (via terrain pins).</li>
+    <li>Where constraints are <b style="color:#c9d1d9">physically impossible</b>, a violation is logged — the route is still delivered.</li>
+  </ul>
+</div>
+
+</body>
+</html>
