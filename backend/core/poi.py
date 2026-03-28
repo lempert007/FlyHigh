@@ -12,11 +12,10 @@ import math
 
 import numpy as np
 
-import config
 from core.geometry import points_in_polygon_utm
 from core.types import AltitudeBand, LatLon, PoiZone
 from core.utm_utils import latlon_to_utm, utm_to_latlon_obj
-from models import ManeuverConfig, POIConfig
+from models import POIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +24,7 @@ MIN_SWEEP_SPACING_M: float = 1.0
 
 
 # ── Rectangle lawnmower ───────────────────────────────────────────────────────
+
 
 def generate_lawnmower_pattern(
     center: LatLon,
@@ -43,7 +43,8 @@ def generate_lawnmower_pattern(
     if sweep_spacing_m < MIN_SWEEP_SPACING_M:
         logger.warning(
             "Sweep spacing %.1f m is below minimum %.1f m — clamped.",
-            sweep_spacing_m, MIN_SWEEP_SPACING_M,
+            sweep_spacing_m,
+            MIN_SWEEP_SPACING_M,
         )
     strip_width = max(sweep_spacing_m, MIN_SWEEP_SPACING_M)
     n_strips = max(1, math.ceil(width_m / strip_width))
@@ -65,12 +66,12 @@ def generate_lawnmower_pattern(
         cross = -half_w + strip_width * (i + 0.5)
         if i % 2 == 0:
             p_start = rotate(cross, -half_h)
-            p_end   = rotate(cross, +half_h)
+            p_end = rotate(cross, +half_h)
         else:
             p_start = rotate(cross, +half_h)
-            p_end   = rotate(cross, -half_h)
+            p_end = rotate(cross, -half_h)
         waypoints.append(utm_to_latlon_obj(p_start[0], p_start[1], zone_str))
-        waypoints.append(utm_to_latlon_obj(p_end[0],   p_end[1],   zone_str))
+        waypoints.append(utm_to_latlon_obj(p_end[0], p_end[1], zone_str))
 
     return waypoints
 
@@ -89,8 +90,9 @@ def generate_warp_and_weft_pattern(
 
 # ── Polygon lawnmower ─────────────────────────────────────────────────────────
 
+
 def generate_lawnmower_polygon_pattern(
-    polygon_latlon: list,   # list[PointLatLon | LatLon]
+    polygon_latlon: list,  # list[PointLatLon | LatLon]
     sweep_spacing_m: float,
     zone_str: str,
     *,
@@ -108,9 +110,13 @@ def generate_lawnmower_polygon_pattern(
     Returns:
         Ordered list of LatLon waypoints inside the polygon.
     """
+
     # Accept both PointLatLon (Pydantic) and LatLon (dataclass)
-    def _lat(v): return v.lat
-    def _lon(v): return v.lon
+    def _lat(v):
+        return v.lat
+
+    def _lon(v):
+        return v.lon
 
     poly_e_list = []
     poly_n_list = []
@@ -142,11 +148,12 @@ def generate_lawnmower_polygon_pattern(
     if sweep_spacing_m < MIN_SWEEP_SPACING_M:
         logger.warning(
             "Sweep spacing %.1f m is below minimum %.1f m — clamped.",
-            sweep_spacing_m, MIN_SWEEP_SPACING_M,
+            sweep_spacing_m,
+            MIN_SWEEP_SPACING_M,
         )
     spacing = max(sweep_spacing_m, MIN_SWEEP_SPACING_M)
     min_e, max_e = float(poly_e.min()), float(poly_e.max())
-    min_n, max_n = float(poly_n.min()), float(poly_n.max())
+    _min_n, _max_n = float(poly_n.min()), float(poly_n.max())
 
     n_strips = max(1, math.ceil((max_e - min_e) / spacing))
     strip_xs = [min_e + spacing * (i + 0.5) for i in range(n_strips)]
@@ -203,7 +210,7 @@ def generate_lawnmower_polygon_pattern(
     idx = 0
     for strip in strips:
         n = len(strip)
-        filtered = [pt for pt, ok in zip(strip, inside_mask[idx: idx + n]) if ok]
+        filtered = [pt for pt, ok in zip(strip, inside_mask[idx : idx + n]) if ok]
         if filtered:
             filtered_strips.append(filtered)
         idx += n
@@ -232,7 +239,8 @@ def generate_lawnmower_polygon_pattern(
             next_strip = filtered_strips[i + 1]
             going_up = len(strip) < 2 or strip[-1][1] >= strip[-2][1]
             junction_n = (
-                max(strip[-1][1], next_strip[0][1]) if going_up
+                max(strip[-1][1], next_strip[0][1])
+                if going_up
                 else min(strip[-1][1], next_strip[0][1])
             )
             # Vertical extension: bring current strip to junction level
@@ -251,6 +259,7 @@ def generate_lawnmower_polygon_pattern(
 
 # ── Entry bearing ─────────────────────────────────────────────────────────────
 
+
 def compute_entry_bearing(previous_point: LatLon, zone_entry_point: LatLon) -> float:
     """Return the bearing (degrees from North) from previous_point to zone_entry_point."""
     e0, n0, _ = latlon_to_utm(previous_point.lat, previous_point.lon)
@@ -259,6 +268,7 @@ def compute_entry_bearing(previous_point: LatLon, zone_entry_point: LatLon) -> f
 
 
 # ── PoiZone factory ───────────────────────────────────────────────────────────
+
 
 def build_poi_zone(
     poi_config: POIConfig,

@@ -13,13 +13,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import DroneIcon from "../components/DroneIcon";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import {
-  MapContainer,
-  CircleMarker,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
+import { MapContainer, CircleMarker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -89,9 +83,15 @@ function DonutChart({ segments }: { segments: DonutSegment[] }) {
       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, width: "100%" }}>
         {segments.map((seg) => (
           <Box key={seg.label} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: seg.color, flexShrink: 0 }} />
-            <Typography sx={{ fontSize: "0.72rem", color: "#8b949e", flex: 1 }}>{seg.label}</Typography>
-            <Typography sx={{ fontSize: "0.72rem", color: "#cdd9e5", fontWeight: 600 }}>{seg.value}</Typography>
+            <Box
+              sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: seg.color, flexShrink: 0 }}
+            />
+            <Typography sx={{ fontSize: "0.72rem", color: "#8b949e", flex: 1 }}>
+              {seg.label}
+            </Typography>
+            <Typography sx={{ fontSize: "0.72rem", color: "#cdd9e5", fontWeight: 600 }}>
+              {seg.value}
+            </Typography>
             <Typography sx={{ fontSize: "0.65rem", color: "#444c56" }}>
               {total > 0 ? `${Math.round((seg.value / total) * 100)}%` : "0%"}
             </Typography>
@@ -162,11 +162,19 @@ function StatusBadge({ status }: { status: MissionStatus }) {
     <Box
       component="span"
       sx={{
-        display: "inline-flex", alignItems: "center",
-        px: 0.75, py: 0.2, borderRadius: "999px",
-        bgcolor: `${color}1a`, border: `1px solid ${color}44`,
-        fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.05em",
-        textTransform: "uppercase", color, lineHeight: 1.6,
+        display: "inline-flex",
+        alignItems: "center",
+        px: 0.75,
+        py: 0.2,
+        borderRadius: "999px",
+        bgcolor: `${color}1a`,
+        border: `1px solid ${color}44`,
+        fontSize: "0.6rem",
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        color,
+        lineHeight: 1.6,
       }}
     >
       {STATUS_LABEL[status] ?? status}
@@ -194,7 +202,9 @@ export default function DashboardPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const statusSegments: DonutSegment[] = [
     { label: "Draft", value: stats?.missions_by_status["draft"] ?? 0, color: STATUS_COLOR.draft },
@@ -203,20 +213,29 @@ export default function DashboardPage() {
   ];
 
   const validPins = (stats?.mission_pins ?? []).filter((p) => p.lat !== null && p.lon !== null);
-  const defaultCenter: [number, number] = validPins.length > 0
-    ? [validPins[0].lat!, validPins[0].lon!]
-    : [30, 15];
+  const defaultCenter: [number, number] =
+    validPins.length > 0 ? [validPins[0].lat!, validPins[0].lon!] : [30, 15];
 
   return (
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
-      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
-
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: "background.default",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {/* Top bar */}
         <Box
           sx={{
-            height: 56, px: 3, flexShrink: 0,
-            display: "flex", alignItems: "center", gap: 2,
+            height: 56,
+            px: 3,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
             borderBottom: "1px solid #21262d",
             bgcolor: "#161b22",
           }}
@@ -231,18 +250,42 @@ export default function DashboardPage() {
             </IconButton>
           </Tooltip>
           <DroneIcon sx={{ fontSize: 20, color: "#1E90FF" }} />
-          <Typography sx={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "3px", color: "#fff" }}>
-            FLY<Box component="span" sx={{ color: "#1E90FF" }}>HIGH</Box>
+          <Typography
+            sx={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "3px", color: "#fff" }}
+          >
+            FLY
+            <Box component="span" sx={{ color: "#1E90FF" }}>
+              HIGH
+            </Box>
           </Typography>
           <Box sx={{ flex: 1 }} />
-          <Typography sx={{ fontSize: "0.75rem", color: "#444c56", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+          <Typography
+            sx={{
+              fontSize: "0.75rem",
+              color: "#444c56",
+              letterSpacing: "0.06em",
+              textTransform: "uppercase",
+            }}
+          >
             Dashboard
           </Typography>
         </Box>
 
         {/* Content */}
-        <Box sx={{ flex: 1, px: { xs: 2, md: 4 }, py: 3, maxWidth: 1400, width: "100%", mx: "auto", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 3 }}>
-
+        <Box
+          sx={{
+            flex: 1,
+            px: { xs: 2, md: 4 },
+            py: 3,
+            maxWidth: 1400,
+            width: "100%",
+            mx: "auto",
+            boxSizing: "border-box",
+            display: "flex",
+            flexDirection: "column",
+            gap: 3,
+          }}
+        >
           {/* Page title */}
           <Box>
             <Typography sx={{ fontSize: "1.25rem", fontWeight: 700, color: "#cdd9e5", mb: 0.25 }}>
@@ -254,7 +297,14 @@ export default function DashboardPage() {
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ bgcolor: "rgba(248,81,73,0.08)", border: "1px solid rgba(248,81,73,0.3)", color: "#f85149" }}>
+            <Alert
+              severity="error"
+              sx={{
+                bgcolor: "rgba(248,81,73,0.08)",
+                border: "1px solid rgba(248,81,73,0.3)",
+                color: "#f85149",
+              }}
+            >
               {error}
             </Alert>
           )}
@@ -264,11 +314,9 @@ export default function DashboardPage() {
               <CircularProgress size={32} sx={{ color: "#1E90FF" }} />
             </Box>
           ) : (
-
             <>
               {/* Stats row */}
               <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-
                 {/* 1 — Missions by status */}
                 <StatCard label="Missions by status">
                   <DonutChart segments={statusSegments} />
@@ -276,17 +324,22 @@ export default function DashboardPage() {
 
                 {/* 2 — Total area surveyed */}
                 <StatCard label="Area surveyed">
-                  <Typography sx={{ fontSize: "1.6rem", fontWeight: 700, color: "#cdd9e5", lineHeight: 1.1 }}>
+                  <Typography
+                    sx={{ fontSize: "1.6rem", fontWeight: 700, color: "#cdd9e5", lineHeight: 1.1 }}
+                  >
                     {formatArea(stats?.total_area_m2 ?? 0)}
                   </Typography>
                   <Typography sx={{ fontSize: "0.72rem", color: "#8b949e", mt: 0.5 }}>
-                    across {stats?.missions_with_area ?? 0} mission{stats?.missions_with_area !== 1 ? "s" : ""}
+                    across {stats?.missions_with_area ?? 0} mission
+                    {stats?.missions_with_area !== 1 ? "s" : ""}
                   </Typography>
                 </StatCard>
 
                 {/* 3 — Estimated flight hours */}
                 <StatCard label="Estimated flight time">
-                  <Typography sx={{ fontSize: "1.6rem", fontWeight: 700, color: "#cdd9e5", lineHeight: 1.1 }}>
+                  <Typography
+                    sx={{ fontSize: "1.6rem", fontWeight: 700, color: "#cdd9e5", lineHeight: 1.1 }}
+                  >
                     {(stats?.estimated_flight_hours ?? 0).toFixed(1)} hrs
                   </Typography>
                   <Typography sx={{ fontSize: "0.72rem", color: "#8b949e", mt: 0.5 }}>
@@ -298,7 +351,14 @@ export default function DashboardPage() {
                 <StatCard label="Most used drone">
                   {stats?.most_used_preset ? (
                     <>
-                      <Typography sx={{ fontSize: "1.1rem", fontWeight: 700, color: "#cdd9e5", lineHeight: 1.2 }}>
+                      <Typography
+                        sx={{
+                          fontSize: "1.1rem",
+                          fontWeight: 700,
+                          color: "#cdd9e5",
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {stats.most_used_preset}
                       </Typography>
                       <Typography sx={{ fontSize: "0.72rem", color: "#8b949e", mt: 0.5 }}>
@@ -313,7 +373,9 @@ export default function DashboardPage() {
                 {/* 5 — Recent activity */}
                 <StatCard label="Recent activity">
                   {!stats?.recent_activity.length ? (
-                    <Typography sx={{ fontSize: "0.78rem", color: "#444c56" }}>No missions yet</Typography>
+                    <Typography sx={{ fontSize: "0.78rem", color: "#444c56" }}>
+                      No missions yet
+                    </Typography>
                   ) : (
                     <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
                       {stats.recent_activity.map((m) => (
@@ -321,8 +383,11 @@ export default function DashboardPage() {
                           key={m.folder}
                           onClick={() => navigate(`/missions/${m.folder}`)}
                           sx={{
-                            display: "flex", alignItems: "center", gap: 1,
-                            cursor: "pointer", py: 0.5,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            cursor: "pointer",
+                            py: 0.5,
                             borderRadius: 1,
                             "&:hover": { bgcolor: "rgba(255,255,255,0.03)" },
                           }}
@@ -330,8 +395,12 @@ export default function DashboardPage() {
                           <StatusBadge status={m.status} />
                           <Typography
                             sx={{
-                              fontSize: "0.75rem", color: "#cdd9e5", flex: 1,
-                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                              fontSize: "0.75rem",
+                              color: "#cdd9e5",
+                              flex: 1,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
                             }}
                           >
                             {m.name}
@@ -358,15 +427,26 @@ export default function DashboardPage() {
                 {/* Map toolbar */}
                 <Box
                   sx={{
-                    px: 2, py: 1.25,
-                    display: "flex", alignItems: "center", gap: 1.5,
+                    px: 2,
+                    py: 1.25,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.5,
                     borderBottom: "1px solid #21262d",
                   }}
                 >
-                  <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#444c56", flex: 1 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                      color: "#444c56",
+                      flex: 1,
+                    }}
+                  >
                     Mission Locations · {validPins.length} pinned
                   </Typography>
-
                 </Box>
 
                 <Box sx={{ height: 420 }}>
@@ -390,14 +470,22 @@ export default function DashboardPage() {
                         radius={8}
                         pathOptions={{
                           color: STATUS_COLOR[pin.status as MissionStatus] ?? STATUS_COLOR.draft,
-                          fillColor: STATUS_COLOR[pin.status as MissionStatus] ?? STATUS_COLOR.draft,
+                          fillColor:
+                            STATUS_COLOR[pin.status as MissionStatus] ?? STATUS_COLOR.draft,
                           fillOpacity: 0.85,
                           weight: 2,
                         }}
                       >
                         <Popup>
                           <Box sx={{ minWidth: 180, p: 0.5 }}>
-                            <Typography sx={{ fontSize: "0.85rem", fontWeight: 700, color: "#cdd9e5", mb: 0.75 }}>
+                            <Typography
+                              sx={{
+                                fontSize: "0.85rem",
+                                fontWeight: 700,
+                                color: "#cdd9e5",
+                                mb: 0.75,
+                              }}
+                            >
                               {pin.name}
                             </Typography>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.75 }}>
@@ -409,9 +497,12 @@ export default function DashboardPage() {
                             <Box
                               onClick={() => navigate(`/missions/${pin.folder}`)}
                               sx={{
-                                display: "flex", alignItems: "center", gap: 0.5,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.5,
                                 cursor: "pointer",
-                                fontSize: "0.72rem", color: "#1E90FF",
+                                fontSize: "0.72rem",
+                                color: "#1E90FF",
                                 "&:hover": { textDecoration: "underline" },
                               }}
                             >
@@ -422,7 +513,6 @@ export default function DashboardPage() {
                         </Popup>
                       </CircleMarker>
                     ))}
-
                   </MapContainer>
                 </Box>
               </Box>

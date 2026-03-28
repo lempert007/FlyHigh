@@ -15,8 +15,12 @@ export function RubberBand({ anchor }: RubberBandProps): React.ReactElement | nu
   const [cursor, setCursor] = useState<[number, number] | null>(null);
 
   useMapEvents({
-    mousemove(e) { setCursor([e.latlng.lat, e.latlng.lng]); },
-    mouseout()   { setCursor(null); },
+    mousemove(e) {
+      setCursor([e.latlng.lat, e.latlng.lng]);
+    },
+    mouseout() {
+      setCursor(null);
+    },
   });
 
   if (!anchor || !cursor) return null;

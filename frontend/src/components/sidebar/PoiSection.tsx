@@ -17,8 +17,14 @@ interface PoiSectionProps {
 
 /** POIs & Maneuvers list with ManeuverCards and an Add POI button. */
 export function PoiSection({
-  pois, onPoiChange, onPoiRemove, onPoiActivatePlace,
-  onActivatePolygonDraw, onPoiDragStart, onPoiDrop, onAddPoi,
+  pois,
+  onPoiChange,
+  onPoiRemove,
+  onPoiActivatePlace,
+  onActivatePolygonDraw,
+  onPoiDragStart,
+  onPoiDrop,
+  onAddPoi,
 }: PoiSectionProps) {
   return (
     <>
@@ -41,7 +47,8 @@ export function PoiSection({
           />
         ))}
         <Button
-          size="small" variant="outlined"
+          size="small"
+          variant="outlined"
           startIcon={<AddLocationIcon />}
           onClick={onAddPoi}
           sx={{ textTransform: "none" }}

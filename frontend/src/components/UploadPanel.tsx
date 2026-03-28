@@ -1,8 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton,
-  LinearProgress, MenuItem, Paper, Select, Stack,
-  Table, TableBody, TableCell, TableRow, Tooltip, Typography,
+  Alert,
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  IconButton,
+  LinearProgress,
+  MenuItem,
+  Paper,
+  Select,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -18,7 +33,12 @@ interface UploadPanelProps {
 
 const typeColor: Record<string, "warning" | "success"> = { DSM: "warning", DTM: "success" };
 
-export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors, uploadResult }: UploadPanelProps) {
+export default function UploadPanel({
+  onUploadSuccess,
+  onClear,
+  elevationErrors,
+  uploadResult,
+}: UploadPanelProps) {
   const [available, setAvailable] = useState<AvailableTiff[]>([]);
   const [fetchLoading, setFetchLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -37,7 +57,9 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
       const tiffs = await fetchAvailableTiffs();
       setAvailable(tiffs);
       // Initialise types from inferred_type; unknown → DSM
-      setTypes(Object.fromEntries(tiffs.map((t) => [t.name, t.inferred_type === "DTM" ? "DTM" : "DSM"])));
+      setTypes(
+        Object.fromEntries(tiffs.map((t) => [t.name, t.inferred_type === "DTM" ? "DTM" : "DSM"]))
+      );
       setChecked({});
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : String(err));
@@ -95,9 +117,15 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
           {fetchLoading && <LinearProgress sx={{ my: 1, borderRadius: 1 }} />}
 
           {fetchError && (
-            <Alert severity="error" sx={{ mb: 1 }} action={
-              <IconButton size="small" onClick={loadLibrary}><RefreshIcon fontSize="small" /></IconButton>
-            }>
+            <Alert
+              severity="error"
+              sx={{ mb: 1 }}
+              action={
+                <IconButton size="small" onClick={loadLibrary}>
+                  <RefreshIcon fontSize="small" />
+                </IconButton>
+              }
+            >
               {fetchError}
             </Alert>
           )}
@@ -114,7 +142,15 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
                 Select one or more files and set the type, then load.
               </Typography>
 
-              <Box sx={{ maxHeight: 280, overflowY: "auto", border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
+              <Box
+                sx={{
+                  maxHeight: 280,
+                  overflowY: "auto",
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
                 {available.map((tiff) => (
                   <Stack
                     key={tiff.name}
@@ -122,7 +158,8 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
                     alignItems="center"
                     spacing={1}
                     sx={{
-                      px: 1, py: 0.5,
+                      px: 1,
+                      py: 0.5,
                       cursor: "pointer",
                       bgcolor: checked[tiff.name] ? "action.selected" : "transparent",
                       "&:hover": { bgcolor: "action.hover" },
@@ -157,7 +194,9 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
               </Box>
 
               {activateError && (
-                <Alert severity="error" onClose={() => setActivateError(null)}>{activateError}</Alert>
+                <Alert severity="error" onClose={() => setActivateError(null)}>
+                  {activateError}
+                </Alert>
               )}
 
               <Stack direction="row" spacing={1} alignItems="center">
@@ -166,9 +205,13 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
                   variant="contained"
                   onClick={handleActivate}
                   disabled={activating || selectedCount === 0}
-                  startIcon={activating ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  startIcon={
+                    activating ? <CircularProgress size={14} color="inherit" /> : undefined
+                  }
                 >
-                  {activating ? "Loading…" : `Load Terrain${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
+                  {activating
+                    ? "Loading…"
+                    : `Load Terrain${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
                 </Button>
                 <Tooltip title="Refresh file list">
                   <span>
@@ -194,8 +237,14 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
           {uploadResult.files.map((f) => (
             <Paper key={f.name} variant="outlined" sx={{ p: 1 }}>
               <Stack direction="row" alignItems="center" spacing={1} mb={0.5}>
-                <Chip label={f.inferred_type} size="small" color={typeColor[f.inferred_type] ?? "default"} />
-                <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1 }}>{f.name}</Typography>
+                <Chip
+                  label={f.inferred_type}
+                  size="small"
+                  color={typeColor[f.inferred_type] ?? "default"}
+                />
+                <Typography variant="body2" fontWeight={600} noWrap sx={{ flex: 1 }}>
+                  {f.name}
+                </Typography>
               </Stack>
               <Table size="small" padding="none">
                 <TableBody>
@@ -211,7 +260,9 @@ export default function UploadPanel({ onUploadSuccess, onClear, elevationErrors,
                   </TableRow>
                   <TableRow>
                     <TableCell sx={{ color: "text.secondary", pr: 1 }}>CRS</TableCell>
-                    <TableCell sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{f.crs}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace", fontSize: "0.7rem" }}>
+                      {f.crs}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

@@ -21,11 +21,7 @@ interface SidebarShellProps {
 function BadgeDot({ badge }: { badge: TabBadge }) {
   if (badge === "none" || !badge) return null;
   const color =
-    badge === "ready" || badge === "done"
-      ? "#00e676"
-      : badge === "warning"
-      ? "#ff9100"
-      : "#1E90FF"; // loading
+    badge === "ready" || badge === "done" ? "#00e676" : badge === "warning" ? "#ff9100" : "#1E90FF"; // loading
   return (
     <Box
       component="span"
@@ -51,7 +47,13 @@ function BadgeDot({ badge }: { badge: TabBadge }) {
 }
 
 /** 800 px fixed-width sidebar with tabbed panels. */
-export function SidebarShell({ tabs, activeTab, onTabChange, onTourStart, tourActive }: SidebarShellProps) {
+export function SidebarShell({
+  tabs,
+  activeTab,
+  onTabChange,
+  onTourStart,
+  tourActive,
+}: SidebarShellProps) {
   return (
     <Box
       sx={{
@@ -135,7 +137,11 @@ export function SidebarShell({ tabs, activeTab, onTabChange, onTourStart, tourAc
                 bgcolor: tourActive ? "rgba(30,144,255,0.1)" : "transparent",
                 border: "1px solid",
                 borderColor: tourActive ? "rgba(30,144,255,0.35)" : "#21262d",
-                "&:hover": { bgcolor: "rgba(30,144,255,0.12)", borderColor: "rgba(30,144,255,0.35)", color: "#1E90FF" },
+                "&:hover": {
+                  bgcolor: "rgba(30,144,255,0.12)",
+                  borderColor: "rgba(30,144,255,0.35)",
+                  color: "#1E90FF",
+                },
               }}
             >
               <HelpOutlineIcon fontSize="small" />

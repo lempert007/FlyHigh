@@ -19,7 +19,14 @@ interface MapMarkersProps {
   onPoiDrag: (poiIdx: number, pt: LatLon) => void;
 }
 
-export function MapMarkers({ start, waypoints, pois, routeSequence, hasRoute, onPoiDrag }: MapMarkersProps) {
+export function MapMarkers({
+  start,
+  waypoints,
+  pois,
+  routeSequence,
+  hasRoute,
+  onPoiDrag,
+}: MapMarkersProps) {
   return (
     <>
       {start && <Marker position={[start.lat, start.lon]} icon={startIcon} />}
@@ -48,13 +55,19 @@ export function MapMarkers({ start, waypoints, pois, routeSequence, hasRoute, on
         </React.Fragment>
       ))}
 
-      {routeSequence.length > 1 && routeSequence.slice(0, -1).map((a, i) => {
-        const b = routeSequence[i + 1];
-        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        return (
-          <Marker key={`dist-${i}`} position={mid} icon={makeDistanceIcon(formatDist(haversineM(a, b)))} interactive={false} />
-        );
-      })}
+      {routeSequence.length > 1 &&
+        routeSequence.slice(0, -1).map((a, i) => {
+          const b = routeSequence[i + 1];
+          const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          return (
+            <Marker
+              key={`dist-${i}`}
+              position={mid}
+              icon={makeDistanceIcon(formatDist(haversineM(a, b)))}
+              interactive={false}
+            />
+          );
+        })}
     </>
   );
 }

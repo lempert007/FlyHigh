@@ -44,7 +44,9 @@ def estimate_energy_wh(
     horiz_dists, _alt_deltas, climb_deltas = _compute_segment_arrays(utm_points, altitudes)
 
     # Horizontal power (Watts)
-    p_horiz = (flight_cfg.drone_weight_kg ** config.POWER_COEFF * flight_cfg.cruise_speed_ms) / config.HOVER_EFFICIENCY
+    p_horiz = (
+        flight_cfg.drone_weight_kg**config.POWER_COEFF * flight_cfg.cruise_speed_ms
+    ) / config.HOVER_EFFICIENCY
 
     # Horizontal energy (Joules)
     horiz_times_s = horiz_dists / flight_cfg.cruise_speed_ms
@@ -96,7 +98,9 @@ def cumulative_energy_wh(
 
     horiz_dists, _alt_deltas, climb_deltas = _compute_segment_arrays(utm_points, altitudes)
 
-    p_horiz = (flight_cfg.drone_weight_kg ** config.POWER_COEFF * flight_cfg.cruise_speed_ms) / config.HOVER_EFFICIENCY
+    p_horiz = (
+        flight_cfg.drone_weight_kg**config.POWER_COEFF * flight_cfg.cruise_speed_ms
+    ) / config.HOVER_EFFICIENCY
     horiz_times_s = horiz_dists / flight_cfg.cruise_speed_ms
     e_horiz_j = p_horiz * horiz_times_s
     e_climb_j = flight_cfg.drone_weight_kg * config.GRAVITY_MS2 * climb_deltas

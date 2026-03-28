@@ -41,7 +41,10 @@ export function useUndoRedo<T>(initial: T): UndoRedoReturn<T> {
   }, []);
 
   const redo = useCallback(() => {
-    setState(({ history: h, cursor: c }) => ({ history: h, cursor: Math.min(h.length - 1, c + 1) }));
+    setState(({ history: h, cursor: c }) => ({
+      history: h,
+      cursor: Math.min(h.length - 1, c + 1),
+    }));
   }, []);
 
   const reset = useCallback((initial: T) => {

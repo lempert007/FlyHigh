@@ -63,7 +63,7 @@ export function buildAglBands(
   cumDists: number[],
   globalMin: number,
   globalMax: number,
-  poiBands: PoiBand[],
+  poiBands: PoiBand[]
 ): { minBand: number[]; maxBand: number[] } {
   const minBand = new Array<number>(cumDists.length).fill(globalMin);
   const maxBand = new Array<number>(cumDists.length).fill(globalMax);
@@ -95,7 +95,7 @@ const POI_ACTIONS = new Set(["poi", "lawnmower", "warp_weft", "ramp_start"]);
 export function buildNodes(
   wps: WpPoint[],
   cumDists: number[],
-  waypointIndices?: number[],
+  waypointIndices?: number[]
 ): AltNode[] {
   const nodes: AltNode[] = [];
   let idCounter = 0;
@@ -116,13 +116,13 @@ export function buildNodes(
 
   for (let i = 1; i < wps.length; i++) {
     const action = wps[i].action;
-    const prevWasPoi      = POI_ACTIONS.has(prevAction);
-    const currIsPoi       = POI_ACTIONS.has(action);
+    const prevWasPoi = POI_ACTIONS.has(prevAction);
+    const _currIsPoi = POI_ACTIONS.has(action);
     const prevWasWaypoint = prevAction === "waypoint";
-    const currIsWaypoint  = action === "waypoint";
+    const currIsWaypoint = action === "waypoint";
 
     // Waypoint handle: per-index when list provided, else per group-start (fallback)
-    const isWaypointHandle = wpSet ? wpSet.has(i) : (currIsWaypoint && !prevWasWaypoint);
+    const isWaypointHandle = wpSet ? wpSet.has(i) : currIsWaypoint && !prevWasWaypoint;
     if (isWaypointHandle) {
       nodes.push({
         id: makeId("waypoint"),
@@ -192,7 +192,7 @@ export function buildNodes(
 export function reconstructAltitudes(
   nodes: AltNode[],
   wps: WpPoint[],
-  cumDists: number[],
+  cumDists: number[]
 ): number[] {
   if (nodes.length === 0) return wps.map((w) => w.alt_m);
 
@@ -203,11 +203,13 @@ export function reconstructAltitudes(
   const poiRanges = sorted
     .filter(
       (n): n is AltNode & { poi_start_dist_m: number; poi_end_dist_m: number } =>
-        n.type === "poi" &&
-        n.poi_start_dist_m !== undefined &&
-        n.poi_end_dist_m !== undefined,
+        n.type === "poi" && n.poi_start_dist_m !== undefined && n.poi_end_dist_m !== undefined
     )
-    .map((n) => ({ start: n.poi_start_dist_m, end: n.poi_end_dist_m, delta: n.alt_m - n.alt_m_original }));
+    .map((n) => ({
+      start: n.poi_start_dist_m,
+      end: n.poi_end_dist_m,
+      delta: n.alt_m - n.alt_m_original,
+    }));
 
   const result = new Array<number>(wps.length);
 
@@ -227,21 +229,25 @@ export function reconstructAltitudes(
     if (inPoi) continue;
 
     // Transit point — binary search for bounding nodes — O(log K)
-    let lo = 0, hi = sorted.length - 1, jA = 0;
+    let lo = 0,
+      hi = sorted.length - 1,
+      jA = 0;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
-      if (nodeDists[mid] <= d) { jA = mid; lo = mid + 1; }
-      else hi = mid - 1;
+      if (nodeDists[mid] <= d) {
+        jA = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
     }
     const jB = Math.min(jA + 1, sorted.length - 1);
     const nodeA = sorted[jA];
     const nodeB = sorted[jB];
 
-    const span   = nodeB.dist_m - nodeA.dist_m;
-    const t      = span > 0 ? (d - nodeA.dist_m) / span : 0;
+    const span = nodeB.dist_m - nodeA.dist_m;
+    const t = span > 0 ? (d - nodeA.dist_m) / span : 0;
     const deltaA = nodeA.alt_m - nodeA.alt_m_original;
     const deltaB = nodeB.alt_m - nodeB.alt_m_original;
-    result[i]    = wps[i].alt_m + deltaA + (deltaB - deltaA) * t;
+    result[i] = wps[i].alt_m + deltaA + (deltaB - deltaA) * t;
   }
 
   return result;
@@ -260,7 +266,7 @@ export function validateAltitudes(
   reconAlt: number[],
   terrain: number[],
   minBand: number[],
-  maxBand: number[],
+  maxBand: number[]
 ): ValidationStatus[] {
   return reconAlt.map((alt, i) => {
     const agl = alt - terrain[i];
@@ -283,13 +289,16 @@ export function interpolateAltAtDist(
   nodes: AltNode[],
   wps: WpPoint[],
   cumDists: number[],
-  dist_m: number,
+  dist_m: number
 ): number {
   let closest = 0;
   let minDiff = Infinity;
   for (let i = 0; i < cumDists.length; i++) {
     const diff = Math.abs(cumDists[i] - dist_m);
-    if (diff < minDiff) { minDiff = diff; closest = i; }
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = i;
+    }
   }
   const reconAlt = reconstructAltitudes(nodes, wps, cumDists);
   return reconAlt[closest];

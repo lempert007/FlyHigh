@@ -13,8 +13,11 @@ interface Options {
 export function useKeyboardShortcuts({ interaction, setInteraction, setWaypoints }: Options): void {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement).tagName === "INPUT" ||
-          (e.target as HTMLElement).tagName === "TEXTAREA") return;
+      if (
+        (e.target as HTMLElement).tagName === "INPUT" ||
+        (e.target as HTMLElement).tagName === "TEXTAREA"
+      )
+        return;
 
       if (e.key === "Escape") {
         setInteraction(INTERACTION_RESET);
@@ -33,6 +36,6 @@ export function useKeyboardShortcuts({ interaction, setInteraction, setWaypoints
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  // interaction is only needed to keep the closure up-to-date for the polygon branch
+    // interaction is only needed to keep the closure up-to-date for the polygon branch
   }, [interaction, setInteraction, setWaypoints]);
 }

@@ -1,0 +1,30 @@
+repos:
+  # ── Python: ruff lint + format ─────────────────────────────────────────────
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        name: ruff (lint + auto-fix)
+        args: [--fix]
+        files: ^backend/
+      - id: ruff-format
+        name: ruff (format)
+        files: ^backend/
+
+  # ── Frontend: Prettier (format) ────────────────────────────────────────────
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier (frontend)
+        language: system
+        entry: frontend/node_modules/.bin/prettier --write
+        files: ^frontend/src/.*\.(ts|tsx|css|json)$
+        pass_filenames: true
+
+      # ── Frontend: ESLint (lint + auto-fix) ─────────────────────────────────
+      - id: eslint
+        name: ESLint (frontend)
+        language: system
+        entry: frontend/node_modules/.bin/eslint --fix --max-warnings=0
+        files: ^frontend/src/.*\.(ts|tsx)$
+        pass_filenames: true

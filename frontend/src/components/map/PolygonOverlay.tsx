@@ -18,7 +18,13 @@ export function PolygonDrawLayer({ vertices, onVertexDragInProgress }: PolygonDr
       {vertices.length >= 2 && (
         <Polygon
           positions={vertices.map((v) => [v.lat, v.lon])}
-          pathOptions={{ color: "#FF9800", fillColor: "#FF9800", fillOpacity: 0.1, weight: 2, dashArray: "6 4" }}
+          pathOptions={{
+            color: "#FF9800",
+            fillColor: "#FF9800",
+            fillOpacity: 0.1,
+            weight: 2,
+            dashArray: "6 4",
+          }}
         />
       )}
       {vertices.map((v, i) => (
@@ -36,16 +42,22 @@ export function PolygonDrawLayer({ vertices, onVertexDragInProgress }: PolygonDr
         />
       ))}
       {/* Edge length labels */}
-      {vertices.length >= 2 && vertices.map((v, i) => {
-        if (i === vertices.length - 1) return null;
-        const next = vertices[i + 1];
-        const a: [number, number] = [v.lat, v.lon];
-        const b: [number, number] = [next.lat, next.lon];
-        const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        return (
-          <Marker key={`pdel-${i}`} position={mid} icon={makeDistanceIcon(formatDist(haversineM(a, b)))} interactive={false} />
-        );
-      })}
+      {vertices.length >= 2 &&
+        vertices.map((v, i) => {
+          if (i === vertices.length - 1) return null;
+          const next = vertices[i + 1];
+          const a: [number, number] = [v.lat, v.lon];
+          const b: [number, number] = [next.lat, next.lon];
+          const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+          return (
+            <Marker
+              key={`pdel-${i}`}
+              position={mid}
+              icon={makeDistanceIcon(formatDist(haversineM(a, b)))}
+              interactive={false}
+            />
+          );
+        })}
     </>
   );
 }
@@ -66,7 +78,12 @@ export function SavedPolygonLayers({ pois, onVertexDrag }: SavedPolygonLayersPro
           <React.Fragment key={`polygroup-${poiIdx}`}>
             <Polygon
               positions={poly.map((v) => [v.lat, v.lon])}
-              pathOptions={{ color: "#f44336", fillColor: "#f44336", fillOpacity: 0.08, weight: 1.5 }}
+              pathOptions={{
+                color: "#f44336",
+                fillColor: "#f44336",
+                fillOpacity: 0.08,
+                weight: 1.5,
+              }}
             />
             {poly.map((v, vi) => (
               <Marker
@@ -88,7 +105,12 @@ export function SavedPolygonLayers({ pois, onVertexDrag }: SavedPolygonLayersPro
               const b: [number, number] = [next.lat, next.lon];
               const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
               return (
-                <Marker key={`pel-${poiIdx}-${vi}`} position={mid} icon={makeDistanceIcon(formatDist(haversineM(a, b)))} interactive={false} />
+                <Marker
+                  key={`pel-${poiIdx}-${vi}`}
+                  position={mid}
+                  icon={makeDistanceIcon(formatDist(haversineM(a, b)))}
+                  interactive={false}
+                />
               );
             })}
           </React.Fragment>
@@ -101,8 +123,12 @@ export function SavedPolygonLayers({ pois, onVertexDrag }: SavedPolygonLayersPro
 /** Cursor coordinate tracker — must be mounted inside MapContainer. */
 export function CursorTracker({ onMove }: { onMove: (pt: [number, number] | null) => void }): null {
   useMapEvents({
-    mousemove(e) { onMove([e.latlng.lat, e.latlng.lng]); },
-    mouseout()   { onMove(null); },
+    mousemove(e) {
+      onMove([e.latlng.lat, e.latlng.lng]);
+    },
+    mouseout() {
+      onMove(null);
+    },
   });
   return null;
 }

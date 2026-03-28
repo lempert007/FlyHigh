@@ -37,7 +37,29 @@ interface ResultsTabProps {
 }
 
 /** Results tab: plan button (pre-plan) or KPI panel + flight preview (post-plan). */
-export function ResultsTab({ meta, zipBlob, flightPreview, canPlan, isConfigValid, isPlanning, planningStep, planError, sessionId, folder, missionName, hasStart, hasPois, onPlan, onClearPlanError, onViolationClick, onAltitudesApplied, batteryWarningPct, batteryErrorPct, violationFilters, onToggleViolationCategory }: ResultsTabProps) {
+export function ResultsTab({
+  meta,
+  zipBlob,
+  flightPreview,
+  canPlan,
+  isConfigValid,
+  isPlanning,
+  planningStep,
+  planError,
+  sessionId,
+  folder,
+  missionName,
+  hasStart,
+  hasPois,
+  onPlan,
+  onClearPlanError,
+  onViolationClick,
+  onAltitudesApplied,
+  batteryWarningPct,
+  batteryErrorPct,
+  violationFilters,
+  onToggleViolationCategory,
+}: ResultsTabProps) {
   const [showPlanDetails, setShowPlanDetails] = useState(false);
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
 
@@ -49,14 +71,38 @@ export function ResultsTab({ meta, zipBlob, flightPreview, canPlan, isConfigVali
   // Pre-plan state: show the Plan button
   if (!meta || !zipBlob) {
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", flex: 1, gap: 2, pt: 1 }} data-tutorial="plan-button">
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1, opacity: 0.45, mb: 1 }}>
-          <Typography variant="body2" color="text.disabled" textAlign="center" sx={{ fontSize: "0.8rem" }}>
-            Set up your mission in the Mission tab,<br />then plan your route here.
+      <Box
+        sx={{ display: "flex", flexDirection: "column", flex: 1, gap: 2, pt: 1 }}
+        data-tutorial="plan-button"
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 1,
+            opacity: 0.45,
+            mb: 1,
+          }}
+        >
+          <Typography
+            variant="body2"
+            color="text.disabled"
+            textAlign="center"
+            sx={{ fontSize: "0.8rem" }}
+          >
+            Set up your mission in the Mission tab,
+            <br />
+            then plan your route here.
           </Typography>
         </Box>
         {!isConfigValid && (
-          <Typography variant="caption" color="warning.main" textAlign="center" sx={{ fontSize: "0.75rem" }}>
+          <Typography
+            variant="caption"
+            color="warning.main"
+            textAlign="center"
+            sx={{ fontSize: "0.75rem" }}
+          >
             ⚠ Flight config has errors — check the Config tab.
           </Typography>
         )}
@@ -90,14 +136,25 @@ export function ResultsTab({ meta, zipBlob, flightPreview, canPlan, isConfigVali
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Tooltip title={showPlanDetails ? "Hide planning log" : "Show planning log"}>
           <Button
-            size="small" variant={showPlanDetails ? "contained" : "outlined"}
+            size="small"
+            variant={showPlanDetails ? "contained" : "outlined"}
             startIcon={<HistoryIcon />}
             onClick={() => setShowPlanDetails((v) => !v)}
             sx={{
-              textTransform: "none", fontSize: "0.72rem",
+              textTransform: "none",
+              fontSize: "0.72rem",
               ...(showPlanDetails
-                ? { bgcolor: "#1c2128", color: "#00e676", borderColor: "#00e676", "&:hover": { bgcolor: "#22302a" } }
-                : { borderColor: "#30363d", color: "text.secondary", "&:hover": { borderColor: "#484f58" } }),
+                ? {
+                    bgcolor: "#1c2128",
+                    color: "#00e676",
+                    borderColor: "#00e676",
+                    "&:hover": { bgcolor: "#22302a" },
+                  }
+                : {
+                    borderColor: "#30363d",
+                    color: "text.secondary",
+                    "&:hover": { borderColor: "#484f58" },
+                  }),
             }}
           >
             Plan log
@@ -105,9 +162,18 @@ export function ResultsTab({ meta, zipBlob, flightPreview, canPlan, isConfigVali
         </Tooltip>
         <Tooltip title="Run planning again with current settings">
           <Button
-            size="small" variant="outlined" startIcon={<RefreshIcon />}
-            onClick={onPlan} disabled={isPlanning}
-            sx={{ textTransform: "none", fontSize: "0.72rem", borderColor: "#30363d", color: "text.secondary", "&:hover": { borderColor: "#484f58" } }}
+            size="small"
+            variant="outlined"
+            startIcon={<RefreshIcon />}
+            onClick={onPlan}
+            disabled={isPlanning}
+            sx={{
+              textTransform: "none",
+              fontSize: "0.72rem",
+              borderColor: "#30363d",
+              color: "text.secondary",
+              "&:hover": { borderColor: "#484f58" },
+            }}
           >
             Re-plan
           </Button>
@@ -119,18 +185,39 @@ export function ResultsTab({ meta, zipBlob, flightPreview, canPlan, isConfigVali
       </Collapse>
 
       <Box data-tutorial="results-panel">
-        <ResultsPanel meta={meta} zipBlob={zipBlob} sessionId={sessionId} folder={folder} onViolationClick={onViolationClick} onAltitudesApplied={onAltitudesApplied} batteryWarningPct={batteryWarningPct} batteryErrorPct={batteryErrorPct} violationFilters={violationFilters} onToggleViolationCategory={onToggleViolationCategory} />
+        <ResultsPanel
+          meta={meta}
+          zipBlob={zipBlob}
+          sessionId={sessionId}
+          folder={folder}
+          onViolationClick={onViolationClick}
+          onAltitudesApplied={onAltitudesApplied}
+          batteryWarningPct={batteryWarningPct}
+          batteryErrorPct={batteryErrorPct}
+          violationFilters={violationFilters}
+          onToggleViolationCategory={onToggleViolationCategory}
+        />
       </Box>
 
-      <Tooltip title={!sessionId ? "Upload terrain data to enable PDF generation" : "Generate a professional PDF mission report"}>
+      <Tooltip
+        title={
+          !sessionId
+            ? "Upload terrain data to enable PDF generation"
+            : "Generate a professional PDF mission report"
+        }
+      >
         <span>
           <Button
-            fullWidth size="small" variant="outlined"
+            fullWidth
+            size="small"
+            variant="outlined"
             startIcon={<PictureAsPdfIcon />}
             onClick={() => setPdfDialogOpen(true)}
             disabled={!sessionId}
             sx={{
-              textTransform: "none", borderColor: "#ef5350", color: "#ef5350",
+              textTransform: "none",
+              borderColor: "#ef5350",
+              color: "#ef5350",
               "&:hover": { borderColor: "#ff5252", bgcolor: "rgba(239,83,80,0.08)" },
               "&.Mui-disabled": { borderColor: "#30363d", color: "#555" },
             }}

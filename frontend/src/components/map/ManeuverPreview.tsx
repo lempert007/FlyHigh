@@ -4,7 +4,7 @@ import type { Poi } from "../../types/mission";
 
 function mToLatLon(originLat: number, originLon: number, dx: number, dy: number): [number, number] {
   const dLat = dy / 111111;
-  const dLon = dx / (111111 * Math.cos(originLat * Math.PI / 180));
+  const dLon = dx / (111111 * Math.cos((originLat * Math.PI) / 180));
   return [originLat + dLat, originLon + dLon];
 }
 
@@ -45,18 +45,32 @@ export const ManeuverPreview = memo(function ManeuverPreview({ poi }: ManeuverPr
     });
   }
 
-  const allStrips = type === "warp_weft"
-    ? [...vStrips(width_m, height_m), ...hStrips(width_m, height_m)]
-    : vStrips(width_m, height_m);
+  const allStrips =
+    type === "warp_weft"
+      ? [...vStrips(width_m, height_m), ...hStrips(width_m, height_m)]
+      : vStrips(width_m, height_m);
 
   return (
     <>
       <Rectangle
         bounds={[sw, ne]}
-        pathOptions={{ color: "#f44336", fillColor: "#f44336", fillOpacity: 0.05, weight: 2, dashArray: "5 4" }}
+        pathOptions={{
+          color: "#f44336",
+          fillColor: "#f44336",
+          fillOpacity: 0.05,
+          weight: 2,
+          dashArray: "5 4",
+        }}
       />
       {allStrips.map((seg, i) => (
-        <Polyline key={i} positions={seg as [number, number][]} color="#f44336" weight={1} opacity={0.45} dashArray="3 3" />
+        <Polyline
+          key={i}
+          positions={seg as [number, number][]}
+          color="#f44336"
+          weight={1}
+          opacity={0.45}
+          dashArray="3 3"
+        />
       ))}
     </>
   );

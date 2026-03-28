@@ -24,11 +24,11 @@ export interface TerrainState {
 }
 
 export function useTerrainState(): TerrainState {
-  const [sessionId, setSessionId]                 = useState<string | null>(null);
-  const [uploadResult, setUploadResult]           = useState<UploadResult | null>(null);
-  const [tiffSelections, setTiffSelections]       = useState<TiffSelection[]>([]);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [tiffSelections, setTiffSelections] = useState<TiffSelection[]>([]);
   const [elevationOverlays, setElevationOverlays] = useState<ElevationOverlay[]>([]);
-  const [elevationErrors, setElevationErrors]     = useState<Record<string, string>>({});
+  const [elevationErrors, setElevationErrors] = useState<Record<string, string>>({});
 
   const blobUrlsRef = useRef<string[]>([]);
 
@@ -45,38 +45,49 @@ export function useTerrainState(): TerrainState {
     [tiffSelections]
   );
 
-  const applyUploadResult = useCallback(async (result: UploadResult) => {
-    setSessionId(result.session_id);
-    setUploadResult(result);
-    setTiffSelections(
-      result.files.map((f) => ({ name: f.name, type: f.inferred_type === "DTM" ? "DTM" : "DSM" }))
-    );
+  const applyUploadResult = useCallback(
+    async (result: UploadResult) => {
+      setSessionId(result.session_id);
+      setUploadResult(result);
+      setTiffSelections(
+        result.files.map((f) => ({ name: f.name, type: f.inferred_type === "DTM" ? "DTM" : "DSM" }))
+      );
 
-    revokeBlobUrls();
-    setElevationOverlays([]);
-    setElevationErrors({});
+      revokeBlobUrls();
+      setElevationOverlays([]);
+      setElevationErrors({});
 
-    const results = await Promise.all(
-      result.files.map(async (f) => {
-        const { url, error } = await fetchElevationImage(result.session_id, f.name);
-        if (url) {
-          blobUrlsRef.current.push(url);
-          return {
-            overlay: { url, bbox: f.bbox, filename: f.name, type: f.inferred_type } as ElevationOverlay,
-            errName: null, errMsg: null,
-          };
-        }
-        return { overlay: null, errName: f.name, errMsg: error };
-      })
-    );
+      const results = await Promise.all(
+        result.files.map(async (f) => {
+          const { url, error } = await fetchElevationImage(result.session_id, f.name);
+          if (url) {
+            blobUrlsRef.current.push(url);
+            return {
+              overlay: {
+                url,
+                bbox: f.bbox,
+                filename: f.name,
+                type: f.inferred_type,
+              } as ElevationOverlay,
+              errName: null,
+              errMsg: null,
+            };
+          }
+          return { overlay: null, errName: f.name, errMsg: error };
+        })
+      );
 
-    setElevationOverlays(results.map((r) => r.overlay).filter((o): o is ElevationOverlay => o !== null));
-    const errMap: Record<string, string> = {};
-    for (const r of results) {
-      if (r.errName && r.errMsg) errMap[r.errName] = r.errMsg;
-    }
-    setElevationErrors(errMap);
-  }, [revokeBlobUrls]);
+      setElevationOverlays(
+        results.map((r) => r.overlay).filter((o): o is ElevationOverlay => o !== null)
+      );
+      const errMap: Record<string, string> = {};
+      for (const r of results) {
+        if (r.errName && r.errMsg) errMap[r.errName] = r.errMsg;
+      }
+      setElevationErrors(errMap);
+    },
+    [revokeBlobUrls]
+  );
 
   const clearTerrain = useCallback(() => {
     revokeBlobUrls();

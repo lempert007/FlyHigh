@@ -12,13 +12,13 @@ import math
 import numpy as np
 
 import config
-from core.geometry import points_in_polygon_utm
 from core.types import AltitudeBand, LatLon, PoiZone, ZoneCrossing
 
 _EPSILON = 1e-15  # tiny jitter to avoid degenerate on-edge cases in ray-casting
 
 
 # ── Point-in-polygon ──────────────────────────────────────────────────────────
+
 
 def _point_in_polygon(lat: float, lon: float, poly: tuple[LatLon, ...]) -> bool:
     """Ray-casting point-in-polygon test for a single point against a LatLon polygon.
@@ -42,6 +42,7 @@ def _point_in_polygon(lat: float, lon: float, poly: tuple[LatLon, ...]) -> bool:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def band_at(
     point: LatLon,
@@ -74,7 +75,6 @@ def find_zone_crossings(
     """
     dlat = leg_end.lat - leg_start.lat
     dlon = leg_end.lon - leg_start.lon
-    leg_len_deg = math.hypot(dlat, dlon)
 
     # Convert rough degree length to metres (approx)
     ref_lat = (leg_start.lat + leg_end.lat) / 2
@@ -121,11 +121,13 @@ def find_zone_crossings(
             lat=leg_start.lat + t_cross * dlat,
             lon=leg_start.lon + t_cross * dlon,
         )
-        crossings.append(ZoneCrossing(
-            point=cross_point,
-            distance_along_leg_m=cross_dist,
-            band_before=bands[i - 1],
-            band_after=bands[i],
-        ))
+        crossings.append(
+            ZoneCrossing(
+                point=cross_point,
+                distance_along_leg_m=cross_dist,
+                band_before=bands[i - 1],
+                band_after=bands[i],
+            )
+        )
 
     return crossings

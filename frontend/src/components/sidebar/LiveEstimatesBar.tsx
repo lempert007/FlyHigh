@@ -25,7 +25,12 @@ export function LiveEstimatesBar({ estimates }: LiveEstimatesBarProps) {
         <Typography
           variant="caption"
           color="text.disabled"
-          sx={{ fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", fontSize: "0.6rem" }}
+          sx={{
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.06em",
+            fontSize: "0.6rem",
+          }}
         >
           Quick Estimate
         </Typography>
@@ -35,15 +40,30 @@ export function LiveEstimatesBar({ estimates }: LiveEstimatesBarProps) {
       </Stack>
       <Stack direction="row" spacing={2.5}>
         <Box>
-          <Typography variant="caption" color="text.disabled" display="block" sx={{ fontSize: "0.6rem" }}>
+          <Typography
+            variant="caption"
+            color="text.disabled"
+            display="block"
+            sx={{ fontSize: "0.6rem" }}
+          >
             Distance
           </Typography>
-          <Typography variant="caption" fontFamily="monospace" fontWeight={600} sx={{ color: "#1E90FF" }}>
+          <Typography
+            variant="caption"
+            fontFamily="monospace"
+            fontWeight={600}
+            sx={{ color: "#1E90FF" }}
+          >
             {formatDist(totalEstDistanceM)}
           </Typography>
         </Box>
         <Box>
-          <Typography variant="caption" color="text.disabled" display="block" sx={{ fontSize: "0.6rem" }}>
+          <Typography
+            variant="caption"
+            color="text.disabled"
+            display="block"
+            sx={{ fontSize: "0.6rem" }}
+          >
             Flight time
           </Typography>
           <Typography variant="caption" fontFamily="monospace" fontWeight={600}>
@@ -52,10 +72,20 @@ export function LiveEstimatesBar({ estimates }: LiveEstimatesBarProps) {
         </Box>
         {estBatteryPct != null && (
           <Box>
-            <Typography variant="caption" color="text.disabled" display="block" sx={{ fontSize: "0.6rem" }}>
+            <Typography
+              variant="caption"
+              color="text.disabled"
+              display="block"
+              sx={{ fontSize: "0.6rem" }}
+            >
               Battery
             </Typography>
-            <Typography variant="caption" fontFamily="monospace" fontWeight={600} sx={{ color: batteryColor }}>
+            <Typography
+              variant="caption"
+              fontFamily="monospace"
+              fontWeight={600}
+              sx={{ color: batteryColor }}
+            >
               ~{Math.round(estBatteryPct)}%
             </Typography>
           </Box>

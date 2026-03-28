@@ -1,13 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Box, CssBaseline, GlobalStyles, Snackbar, ThemeProvider } from "@mui/material";
 
 import { appTheme } from "./theme";
 import { DRONE_PRESETS, DEFAULT_CONFIG } from "./dronePresets";
 import type { DronePreset } from "./dronePresets";
-import { activateTiffs, loadMission, saveMission, getPresets, savePlanFromSession, getSettings } from "./api";
+import {
+  activateTiffs,
+  loadMission,
+  saveMission,
+  getPresets,
+  savePlanFromSession,
+  getSettings,
+} from "./api";
 import type { MissionSavePayload } from "./api";
-import type { AppSettings, FlightConfig, LatLon, MissionStatus, UploadResult, Waypoint, Poi, PresetItem } from "./types/mission";
+import type {
+  AppSettings,
+  FlightConfig,
+  LatLon,
+  MissionStatus,
+  UploadResult,
+  Waypoint,
+  Poi,
+  PresetItem,
+} from "./types/mission";
 import { useMissionState } from "./hooks/useMissionState";
 import { usePlanRoute } from "./hooks/usePlanRoute";
 import { useRouteIO } from "./hooks/useRouteIO";
@@ -40,27 +56,47 @@ export default function App() {
 
   // Plan result state (meta, zip, route points, AGL profile)
   const planResults = usePlanResults();
-  const { clearPlan, restorePlan, setPlanMeta, setZipBlob, setRoutePoints, setRouteAglProfile } = planResults;
+  const { clearPlan, restorePlan, setPlanMeta, setZipBlob, setRoutePoints, setRouteAglProfile } =
+    planResults;
 
   // Route / mission state (waypoints, POIs, undo history)
   const mission = useMissionState();
   const {
-    start, waypoints, pois, missionName, missionNotes, interaction,
-    canUndo, canRedo,
-    setWaypoints, setMissionName, setMissionNotes, setInteraction,
-    undo, redo, resetHistory,
+    start,
+    waypoints,
+    pois,
+    missionName,
+    missionNotes,
+    interaction,
+    canUndo,
+    canRedo,
+    setWaypoints,
+    setMissionName,
+    setMissionNotes,
+    setInteraction,
+    undo,
+    redo,
+    resetHistory,
   } = mission;
 
   // API-driven drone presets (falls back to hardcoded DRONE_PRESETS on error)
   const [apiPresets, setApiPresets] = useState<PresetItem[]>([]);
   useEffect(() => {
-    getPresets().then(setApiPresets).catch(() => { /* fall back to DRONE_PRESETS */ });
+    getPresets()
+      .then(setApiPresets)
+      .catch(() => {
+        /* fall back to DRONE_PRESETS */
+      });
   }, []);
 
   // Global application settings
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   useEffect(() => {
-    getSettings().then(setAppSettings).catch(() => { /* fall back to defaults in components */ });
+    getSettings()
+      .then(setAppSettings)
+      .catch(() => {
+        /* fall back to defaults in components */
+      });
   }, []);
 
   // Config + takeoff — for new missions, defaults are overridden once settings load
@@ -75,26 +111,33 @@ export default function App() {
       max_agl_m: appSettings.default_max_agl_m,
       spacing_m: appSettings.default_spacing_m,
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appSettings]);
   const [takeoffMode, setTakeoffMode] = useState<"auto" | "fixed">("auto");
   const [takeoffAltM, setTakeoffAltM] = useState(50);
-  const [violationFilters, setViolationFilters] = useState({ safety: true, product_poi: true, product_route: true });
-  const handleToggleViolationCategory = useCallback((cat: "safety" | "product_poi" | "product_route") => {
-    setViolationFilters((prev) => ({ ...prev, [cat]: !prev[cat] }));
-  }, []);
+  const [violationFilters, setViolationFilters] = useState({
+    safety: true,
+    product_poi: true,
+    product_route: true,
+  });
+  const handleToggleViolationCategory = useCallback(
+    (cat: "safety" | "product_poi" | "product_route") => {
+      setViolationFilters((prev) => ({ ...prev, [cat]: !prev[cat] }));
+    },
+    []
+  );
 
   // Mission metadata
   const [missionStatus, setMissionStatus] = useState<MissionStatus>("draft");
-  const [isSaving, setIsSaving]           = useState(false);
-  const [saveError, setSaveError]         = useState<string | null>(null);
-  const [isLoading, setIsLoading]         = useState(!!folder);
-  const [mapFlyTarget, setMapFlyTarget]   = useState<LatLon | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(!!folder);
+  const [mapFlyTarget, setMapFlyTarget] = useState<LatLon | null>(null);
 
   // Dirty tracking
   const [isDirty, setIsDirty] = useState(false);
   const isDirtyRef = useRef(false);
-  const loadedRef  = useRef(false);
+  const loadedRef = useRef(false);
 
   const { snack, showSnack, clearSnack } = useSnackbar();
   useKeyboardShortcuts({ interaction, setInteraction, setWaypoints });
@@ -107,8 +150,17 @@ export default function App() {
     if (!loadedRef.current) return;
     isDirtyRef.current = true;
     setIsDirty(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, waypoints, pois, missionName, missionNotes, flightConfig, takeoffMode, takeoffAltM, missionStatus]);
+  }, [
+    start,
+    waypoints,
+    pois,
+    missionName,
+    missionNotes,
+    flightConfig,
+    takeoffMode,
+    takeoffAltM,
+    missionStatus,
+  ]);
 
   // Convert API presets to DronePreset shape; fall back to built-in if none loaded
   const dronePresets: DronePreset[] = useMemo(() => {
@@ -130,10 +182,11 @@ export default function App() {
     for (const p of apiPresets) {
       if (
         p.cruise_speed_ms === flightConfig.cruise_speed_ms &&
-        p.climb_rate_ms   === flightConfig.climb_rate_ms &&
-        p.battery_wh      === flightConfig.battery_wh &&
+        p.climb_rate_ms === flightConfig.climb_rate_ms &&
+        p.battery_wh === flightConfig.battery_wh &&
         p.drone_weight_kg === flightConfig.drone_weight_kg
-      ) return p.name;
+      )
+        return p.name;
     }
     return null;
   }, [apiPresets, flightConfig]);
@@ -144,9 +197,11 @@ export default function App() {
     setFlightConfig((prev) => ({
       ...prev,
       safety_radius_terrain: terrain.availableTerrainTypes.includes(prev.safety_radius_terrain)
-        ? prev.safety_radius_terrain : terrain.availableTerrainTypes[0],
+        ? prev.safety_radius_terrain
+        : terrain.availableTerrainTypes[0],
       camera_range_terrain: terrain.availableTerrainTypes.includes(prev.camera_range_terrain)
-        ? prev.camera_range_terrain : terrain.availableTerrainTypes[0],
+        ? prev.camera_range_terrain
+        : terrain.availableTerrainTypes[0],
     }));
   }, [terrain.availableTerrainTypes]);
 
@@ -163,7 +218,10 @@ export default function App() {
 
   // Load mission from backend on mount
   useEffect(() => {
-    if (!folder) { setIsLoading(false); return; }
+    if (!folder) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
 
     loadMission(folder)
@@ -175,14 +233,18 @@ export default function App() {
         });
         if (state.name) setMissionName(state.name);
         if (state.route?.flightConfig) setFlightConfig(state.route.flightConfig as FlightConfig);
-        if (state.route?.takeoffMode)  setTakeoffMode(state.route.takeoffMode);
+        if (state.route?.takeoffMode) setTakeoffMode(state.route.takeoffMode);
         if (state.route?.takeoffAltM != null) setTakeoffAltM(state.route.takeoffAltM);
         if (state.status) setMissionStatus(state.status);
         if (state.notes != null) setMissionNotes(state.notes);
 
         // Warn if the saved preset was deleted
         const savedPreset = state.preset_name ?? null;
-        if (savedPreset && apiPresets.length > 0 && !apiPresets.some((p) => p.name === savedPreset)) {
+        if (
+          savedPreset &&
+          apiPresets.length > 0 &&
+          !apiPresets.some((p) => p.name === savedPreset)
+        ) {
           showSnack(`'${savedPreset}' preset was removed — using saved values.`, "warning");
         }
 
@@ -210,18 +272,21 @@ export default function App() {
       })
       .finally(() => {
         setIsLoading(false);
-        loadedRef.current   = true;
-        isDirtyRef.current  = false;
+        loadedRef.current = true;
+        isDirtyRef.current = false;
         setIsDirty(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [folder]);
 
   // Upload handlers
-  const handleUploadSuccess = useCallback(async (result: UploadResult) => {
-    clearPlan(); // new terrain invalidates previous plan
-    await applyUploadResult(result);
-  }, [clearPlan, applyUploadResult]);
+  const handleUploadSuccess = useCallback(
+    async (result: UploadResult) => {
+      clearPlan(); // new terrain invalidates previous plan
+      await applyUploadResult(result);
+    },
+    [clearPlan, applyUploadResult]
+  );
 
   const handleUploadClear = useCallback(() => {
     clearTerrain();
@@ -239,9 +304,12 @@ export default function App() {
       tiff_selections: terrain.tiffSelections,
       preset_name: activePresetName,
       route: {
-        start, waypoints,
+        start,
+        waypoints,
         pois: pois.map((p) => ({ ...p })),
-        flightConfig, takeoffMode, takeoffAltM,
+        flightConfig,
+        takeoffMode,
+        takeoffAltM,
       } as Record<string, unknown>,
     };
     try {
@@ -256,7 +324,21 @@ export default function App() {
     } finally {
       setIsSaving(false);
     }
-  }, [folder, missionName, missionStatus, missionNotes, terrain.tiffSelections, start, waypoints, pois, flightConfig, takeoffMode, takeoffAltM, activePresetName, showSnack]);
+  }, [
+    folder,
+    missionName,
+    missionStatus,
+    missionNotes,
+    terrain.tiffSelections,
+    start,
+    waypoints,
+    pois,
+    flightConfig,
+    takeoffMode,
+    takeoffAltM,
+    activePresetName,
+    showSnack,
+  ]);
 
   // Back to missions list
   const handleBack = useCallback(() => {
@@ -266,7 +348,14 @@ export default function App() {
   }, [navigate]);
 
   // Route IO (JSON export/import)
-  const { loadRouteError, loadRouteSnack, clearLoadRouteError, clearLoadRouteSnack, handleSaveRoute: handleExportRoute, handleLoadRoute } = useRouteIO(
+  const {
+    loadRouteError,
+    loadRouteSnack,
+    clearLoadRouteError,
+    clearLoadRouteSnack,
+    handleSaveRoute: handleExportRoute,
+    handleLoadRoute,
+  } = useRouteIO(
     { start, waypoints, pois, flightConfig, missionName, tiffSelections: terrain.tiffSelections },
     async ({ start: s, waypoints: wps, pois: ps, flightConfig: fc, name, tiff_selections }) => {
       resetHistory({
@@ -289,24 +378,43 @@ export default function App() {
   );
 
   useEffect(() => {
-    if (loadRouteSnack) { showSnack(loadRouteSnack, "success"); clearLoadRouteSnack(); }
+    if (loadRouteSnack) {
+      showSnack(loadRouteSnack, "success");
+      clearLoadRouteSnack();
+    }
   }, [loadRouteSnack, showSnack, clearLoadRouteSnack]);
 
   // Waypoint editing
-  const handleWaypointNameChange = useCallback((i: number, name: string) => {
-    setWaypoints((prev) => prev.map((wp, j) => j === i ? { ...wp, name } : wp));
-  }, [setWaypoints]);
+  const handleWaypointNameChange = useCallback(
+    (i: number, name: string) => {
+      setWaypoints((prev) => prev.map((wp, j) => (j === i ? { ...wp, name } : wp)));
+    },
+    [setWaypoints]
+  );
 
-  const handleRemoveWaypoint = useCallback((i: number) => {
-    setWaypoints((prev) => prev.filter((_, j) => j !== i));
-  }, [setWaypoints]);
+  const handleRemoveWaypoint = useCallback(
+    (i: number) => {
+      setWaypoints((prev) => prev.filter((_, j) => j !== i));
+    },
+    [setWaypoints]
+  );
 
   // Planning
   const canPlan = !!terrain.sessionId && !!start && pois.length > 0;
   const isConfigValid = flightConfig.min_agl_m < flightConfig.max_agl_m;
 
   const { isPlanning, planningStep, planError, clearPlanError, handlePlan } = usePlanRoute(
-    { sessionId: terrain.sessionId, start, waypoints, pois, flightConfig, missionName, missionNotes, takeoffMode, takeoffAltM },
+    {
+      sessionId: terrain.sessionId,
+      start,
+      waypoints,
+      pois,
+      flightConfig,
+      missionName,
+      missionNotes,
+      takeoffMode,
+      takeoffAltM,
+    },
     (meta, blob, routePts, aglProfile) => {
       setPlanMeta(meta);
       setZipBlob(blob);
@@ -316,7 +424,9 @@ export default function App() {
       if (meta?.smart_route_summary) showSnack(meta.smart_route_summary, "info");
       setActiveTab(2);
       if (folder && terrain.sessionId) {
-        savePlanFromSession(folder, terrain.sessionId).catch(() => { /* fire-and-forget */ });
+        savePlanFromSession(folder, terrain.sessionId).catch(() => {
+          /* fire-and-forget */
+        });
       }
     }
   );
@@ -428,7 +538,15 @@ export default function App() {
     return (
       <ThemeProvider theme={appTheme}>
         <CssBaseline />
-        <Box sx={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "background.default" }}>
+        <Box
+          sx={{
+            height: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            bgcolor: "background.default",
+          }}
+        >
           <Box sx={{ color: "text.secondary" }}>Loading mission…</Box>
         </Box>
       </ThemeProvider>
@@ -438,15 +556,25 @@ export default function App() {
   return (
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
-      <GlobalStyles styles={{
-        "@keyframes tutGlow": { from: { opacity: 0.7 }, to: { opacity: 1 } },
-        "@keyframes tutPulse": {
-          "0%, 100%": { boxShadow: "0 0 0 0 rgba(30,144,255,0.5)" },
-          "50%":       { boxShadow: "0 0 0 8px rgba(30,144,255,0)" },
-        },
-      }} />
-      <Box sx={{ height: "100vh", display: "flex", overflow: "hidden", bgcolor: "background.default" }}>
-        <SidebarShell tabs={tabs} activeTab={activeTab} onTabChange={setActiveTab} onTourStart={tutorial.start} tourActive={tutorial.active} />
+      <GlobalStyles
+        styles={{
+          "@keyframes tutGlow": { from: { opacity: 0.7 }, to: { opacity: 1 } },
+          "@keyframes tutPulse": {
+            "0%, 100%": { boxShadow: "0 0 0 0 rgba(30,144,255,0.5)" },
+            "50%": { boxShadow: "0 0 0 8px rgba(30,144,255,0)" },
+          },
+        }}
+      />
+      <Box
+        sx={{ height: "100vh", display: "flex", overflow: "hidden", bgcolor: "background.default" }}
+      >
+        <SidebarShell
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onTourStart={tutorial.start}
+          tourActive={tutorial.active}
+        />
 
         <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
           <MapCanvas

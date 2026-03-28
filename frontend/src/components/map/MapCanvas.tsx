@@ -2,7 +2,16 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Button, Slide, Snackbar, Typography } from "@mui/material";
 import { ImageOverlay, MapContainer, Rectangle, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
-import type { ElevationOverlay, InteractionMode, LatLon, PlaceMode, Poi, UploadResult, Violation, Waypoint } from "../../types/mission";
+import type {
+  ElevationOverlay,
+  InteractionMode,
+  LatLon,
+  PlaceMode,
+  Poi,
+  UploadResult,
+  Violation,
+  Waypoint,
+} from "../../types/mission";
 import type { InteractionState } from "../../types/mission";
 import { haversineM, formatDist } from "../../utils/math";
 import type { FlightPreviewState } from "../../hooks/useFlightPreview";
@@ -33,15 +42,20 @@ const ElevationLayers = memo(
   }) {
     return (
       <>
-        {overlays.filter((ov) => visible.has(ov.filename)).map((ov) => (
-          <ImageOverlay
-            key={ov.filename}
-            url={ov.url}
-            bounds={[[ov.bbox[1], ov.bbox[0]], [ov.bbox[3], ov.bbox[2]]]}
-            opacity={opacity}
-            zIndex={10}
-          />
-        ))}
+        {overlays
+          .filter((ov) => visible.has(ov.filename))
+          .map((ov) => (
+            <ImageOverlay
+              key={ov.filename}
+              url={ov.url}
+              bounds={[
+                [ov.bbox[1], ov.bbox[0]],
+                [ov.bbox[3], ov.bbox[2]],
+              ]}
+              opacity={opacity}
+              zIndex={10}
+            />
+          ))}
       </>
     );
   },
@@ -53,7 +67,7 @@ const ElevationLayers = memo(
       if (!next.visible.has(name)) return false;
     }
     return true;
-  },
+  }
 );
 import { MapMarkers } from "./MapMarkers";
 import { MapRoute, FitOnUpload } from "./MapRoute";
@@ -103,43 +117,78 @@ function ZoomControls() {
   }, []);
 
   const btn = {
-    display: "flex", alignItems: "center", justifyContent: "center",
-    width: 28, height: 28, cursor: "pointer",
-    color: "#c9d1d9", fontSize: "1.1rem", fontWeight: 300, lineHeight: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 28,
+    height: 28,
+    cursor: "pointer",
+    color: "#c9d1d9",
+    fontSize: "1.1rem",
+    fontWeight: 300,
+    lineHeight: 1,
     userSelect: "none" as const,
     "&:hover": { bgcolor: "rgba(255,255,255,0.07)", color: "#fff" },
     transition: "all 0.15s",
   };
 
   return (
-    <Box ref={containerRef} sx={{
-      position: "absolute", top: 10, right: 10, zIndex: 1000,
-      bgcolor: "#161b22", border: "1px solid #30363d", borderRadius: "6px",
-      overflow: "hidden", display: "flex", flexDirection: "column",
-    }}>
-      <Box sx={{ ...btn, borderBottom: "1px solid #30363d" }} onClick={() => map.setZoom(map.getZoom() + 1)}>+</Box>
-      <Box sx={btn} onClick={() => map.setZoom(map.getZoom() - 1)}>−</Box>
+    <Box
+      ref={containerRef}
+      sx={{
+        position: "absolute",
+        top: 10,
+        right: 10,
+        zIndex: 1000,
+        bgcolor: "#161b22",
+        border: "1px solid #30363d",
+        borderRadius: "6px",
+        overflow: "hidden",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box
+        sx={{ ...btn, borderBottom: "1px solid #30363d" }}
+        onClick={() => map.setZoom(map.getZoom() + 1)}
+      >
+        +
+      </Box>
+      <Box sx={btn} onClick={() => map.setZoom(map.getZoom() - 1)}>
+        −
+      </Box>
     </Box>
   );
 }
 
-function resolveAnchor(placeMode: string, start: LatLon | null, waypoints: Waypoint[], pois: Poi[]): [number, number] | null {
+function resolveAnchor(
+  placeMode: string,
+  start: LatLon | null,
+  waypoints: Waypoint[],
+  pois: Poi[]
+): [number, number] | null {
   if (placeMode === "none" || placeMode === "start") return null;
   if (placeMode === "waypoint") {
-    if (waypoints.length > 0) return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lon];
+    if (waypoints.length > 0)
+      return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lon];
     if (start) return [start.lat, start.lon];
     return null;
   }
   if (placeMode === "poi") {
     if (pois.length > 0) return [pois[pois.length - 1].point.lat, pois[pois.length - 1].point.lon];
-    if (waypoints.length > 0) return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lon];
+    if (waypoints.length > 0)
+      return [waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lon];
     if (start) return [start.lat, start.lon];
     return null;
   }
   return null;
 }
 
-function buildRouteSequence(start: LatLon | null, waypoints: Waypoint[], pois: Poi[]): [number, number][] {
+function buildRouteSequence(
+  start: LatLon | null,
+  waypoints: Waypoint[],
+  pois: Poi[]
+): [number, number][] {
   const pts: [number, number][] = [];
   if (start) pts.push([start.lat, start.lon]);
   for (const wp of waypoints) pts.push([wp.lat, wp.lon]);
@@ -148,13 +197,30 @@ function buildRouteSequence(start: LatLon | null, waypoints: Waypoint[], pois: P
 }
 
 export default function MapCanvas({
-  start, waypoints, pois, uploadResult, routePoints, interaction,
-  onPlacePoint, onSetPlaceMode, onPolygonVertex, onPolygonClose,
-  onPolygonVertexDrag, onPolygonVertexDragInProgress, onPoiDrag,
-  elevationOverlays, sessionId, mapBottomPad = "8px", flightPreview,
-  routeAglProfile, minAglM, mapFlyTarget, violations,
+  start,
+  waypoints,
+  pois,
+  uploadResult,
+  routePoints,
+  interaction,
+  onPlacePoint,
+  onSetPlaceMode,
+  onPolygonVertex,
+  onPolygonClose,
+  onPolygonVertexDrag,
+  onPolygonVertexDragInProgress,
+  onPoiDrag,
+  elevationOverlays,
+  sessionId,
+  mapBottomPad = "8px",
+  flightPreview,
+  routeAglProfile,
+  minAglM,
+  mapFlyTarget,
+  violations,
 }: MapCanvasProps) {
-  const placeMode: PlaceMode = interaction.mode === "polygon" ? "none" : interaction.mode as PlaceMode;
+  const placeMode: PlaceMode =
+    interaction.mode === "polygon" ? "none" : (interaction.mode as PlaceMode);
   const polygonDrawPoiIndex = interaction.mode === "polygon" ? interaction.poiIndex : null;
   const polygonVertices = interaction.polygonVertices;
 
@@ -188,39 +254,57 @@ export default function MapCanvas({
     const inside = elevationOverlays.some(
       ({ bbox: [w, s, e, n] }) => lon >= w && lon <= e && lat >= s && lat <= n
     );
-    if (!inside) { setCursorElevation(null); return; }
+    if (!inside) {
+      setCursorElevation(null);
+      return;
+    }
 
     if (elevFetchTimer.current) clearTimeout(elevFetchTimer.current);
     elevFetchTimer.current = setTimeout(async () => {
       try {
         const r = await fetch(`/elevation-point/${sessionId}?lat=${lat}&lon=${lon}`);
         if (r.ok) {
-          const { elevation_m } = await r.json() as { elevation_m: number };
+          const { elevation_m } = (await r.json()) as { elevation_m: number };
           setCursorElevation(elevation_m);
         }
-      } catch { /* network error — silently ignore */ }
+      } catch {
+        /* network error — silently ignore */
+      }
     }, 120);
-    return () => { if (elevFetchTimer.current) clearTimeout(elevFetchTimer.current); };
+    return () => {
+      if (elevFetchTimer.current) clearTimeout(elevFetchTimer.current);
+    };
   }, [cursorLatLon, sessionId, elevationOverlays]);
 
   // Esc: cancel ruler, cancel pending radius, or exit radius mode
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
-      if (rulerMode) { setRulerMode(false); setRulerPoints([]); setRulerCursor(null); }
-      if (pendingCenter) { setPendingCenter(null); setPendingRadiusM(""); }
-      else if (radiusMode) { setRadiusMode(false); }
+      if (rulerMode) {
+        setRulerMode(false);
+        setRulerPoints([]);
+        setRulerCursor(null);
+      }
+      if (pendingCenter) {
+        setPendingCenter(null);
+        setPendingRadiusM("");
+      } else if (radiusMode) {
+        setRadiusMode(false);
+      }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [rulerMode, radiusMode, pendingCenter]);
 
-  const allLatLons = useMemo(() => [
-    ...(start ? [[start.lat, start.lon]] as [number, number][] : []),
-    ...waypoints.map((w): [number, number] => [w.lat, w.lon]),
-    ...pois.map((p): [number, number] => [p.point.lat, p.point.lon]),
-    ...routePoints.map((p): [number, number] => [p.lat, p.lon]),
-  ], [start, waypoints, pois, routePoints]);
+  const allLatLons = useMemo(
+    () => [
+      ...(start ? ([[start.lat, start.lon]] as [number, number][]) : []),
+      ...waypoints.map((w): [number, number] => [w.lat, w.lon]),
+      ...pois.map((p): [number, number] => [p.point.lat, p.point.lon]),
+      ...routePoints.map((p): [number, number] => [p.lat, p.lon]),
+    ],
+    [start, waypoints, pois, routePoints]
+  );
 
   const routeSequence = buildRouteSequence(start, waypoints, pois);
   const routeLeaflet = routePoints.map((p): [number, number] => [p.lat, p.lon]);
@@ -228,18 +312,26 @@ export default function MapCanvas({
 
   function toggleRuler() {
     if (rulerMode) {
-      setRulerMode(false); setRulerPoints([]); setRulerCursor(null);
+      setRulerMode(false);
+      setRulerPoints([]);
+      setRulerCursor(null);
     } else {
-      setRulerMode(true); setRadiusMode(false); setPendingCenter(null);
+      setRulerMode(true);
+      setRadiusMode(false);
+      setPendingCenter(null);
       onSetPlaceMode("none");
     }
   }
 
   function toggleRadiusMode() {
     if (radiusMode) {
-      setRadiusMode(false); setPendingCenter(null); setPendingRadiusM("");
+      setRadiusMode(false);
+      setPendingCenter(null);
+      setPendingRadiusM("");
     } else {
-      setRadiusMode(true); setRulerMode(false); setRulerPoints([]);
+      setRadiusMode(true);
+      setRulerMode(false);
+      setRulerPoints([]);
       onSetPlaceMode("none");
     }
   }
@@ -248,21 +340,28 @@ export default function MapCanvas({
     const r = parseFloat(pendingRadiusM);
     if (!pendingCenter || isNaN(r) || r <= 0) return;
     setRadiusCircles((prev) => [...prev, { id: Date.now(), ...pendingCenter, radiusM: r }]);
-    setPendingCenter(null); setPendingRadiusM("");
+    setPendingCenter(null);
+    setPendingRadiusM("");
   }
 
   const isActive = placeMode !== "none" || polygonDrawPoiIndex !== null || rulerMode;
   const cursor = isActive || radiusMode ? "crosshair" : "grab";
 
-  const statusText = polygonDrawPoiIndex !== null
-    ? `Drawing polygon — ${polygonVertices.length} vertices (need ≥ 3)`
-    : rulerMode
-    ? `Measuring${rulerPoints.length > 1 ? ` — ${formatDist(rulerPoints.reduce((sum, _, i) => i === 0 ? sum : sum + haversineM(rulerPoints[i - 1], rulerPoints[i]), 0))}` : " — click to start"}`
-    : `Placing: ${placeMode} — click to confirm (Esc to cancel)`;
+  const statusText =
+    polygonDrawPoiIndex !== null
+      ? `Drawing polygon — ${polygonVertices.length} vertices (need ≥ 3)`
+      : rulerMode
+        ? `Measuring${rulerPoints.length > 1 ? ` — ${formatDist(rulerPoints.reduce((sum, _, i) => (i === 0 ? sum : sum + haversineM(rulerPoints[i - 1], rulerPoints[i])), 0))}` : " — click to start"}`
+        : `Placing: ${placeMode} — click to confirm (Esc to cancel)`;
 
   return (
     <Box sx={{ height: "100%", width: "100%", position: "relative", cursor }}>
-      <MapContainer center={[39, -98]} zoom={4} zoomControl={false} style={{ height: "100%", width: "100%" }}>
+      <MapContainer
+        center={[39, -98]}
+        zoom={4}
+        zoomControl={false}
+        style={{ height: "100%", width: "100%" }}
+      >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -277,15 +376,39 @@ export default function MapCanvas({
         {uploadResult?.files?.map((f) => (
           <Rectangle
             key={`bbox-${f.name}`}
-            bounds={[[f.bbox[1], f.bbox[0]], [f.bbox[3], f.bbox[2]]]}
-            pathOptions={{ color: f.inferred_type === "DTM" ? "#4caf50" : "#FF9800", weight: 1.5, dashArray: "6 4", fillOpacity: 0 }}
+            bounds={[
+              [f.bbox[1], f.bbox[0]],
+              [f.bbox[3], f.bbox[2]],
+            ]}
+            pathOptions={{
+              color: f.inferred_type === "DTM" ? "#4caf50" : "#FF9800",
+              weight: 1.5,
+              dashArray: "6 4",
+              fillOpacity: 0,
+            }}
           />
         ))}
 
-        {polygonDrawPoiIndex !== null
-          ? <PolygonDrawHandler onVertex={onPolygonVertex} onClose={onPolygonClose} vertexCount={polygonVertices.length} onNotEnoughVertices={() => setPolyToast(true)} />
-          : <ClickHandler placeMode={placeMode} onPlacePoint={onPlacePoint} rulerMode={rulerMode} onRulerClick={(pt) => setRulerPoints((p) => [...p, pt])} radiusMode={radiusMode} onRadiusClick={(pt) => { setPendingCenter(pt); setPendingRadiusM(""); }} />
-        }
+        {polygonDrawPoiIndex !== null ? (
+          <PolygonDrawHandler
+            onVertex={onPolygonVertex}
+            onClose={onPolygonClose}
+            vertexCount={polygonVertices.length}
+            onNotEnoughVertices={() => setPolyToast(true)}
+          />
+        ) : (
+          <ClickHandler
+            placeMode={placeMode}
+            onPlacePoint={onPlacePoint}
+            rulerMode={rulerMode}
+            onRulerClick={(pt) => setRulerPoints((p) => [...p, pt])}
+            radiusMode={radiusMode}
+            onRadiusClick={(pt) => {
+              setPendingCenter(pt);
+              setPendingRadiusM("");
+            }}
+          />
+        )}
 
         <AutoFit allLatLons={allLatLons} fitKey={fitKey} />
         <FitOnUpload uploadResult={uploadResult} />
@@ -299,7 +422,10 @@ export default function MapCanvas({
           <RubberBand anchor={rubberAnchor} />
         )}
 
-        <PolygonDrawLayer vertices={polygonVertices} onVertexDragInProgress={onPolygonVertexDragInProgress} />
+        <PolygonDrawLayer
+          vertices={polygonVertices}
+          onVertexDragInProgress={onPolygonVertexDragInProgress}
+        />
         <SavedPolygonLayers pois={pois} onVertexDrag={onPolygonVertexDrag} />
 
         <FlyTarget target={mapFlyTarget} />
@@ -327,12 +453,24 @@ export default function MapCanvas({
 
       {/* Cursor coordinates + elevation — bottom right */}
       {cursorLatLon && (
-        <Box sx={{
-          position: "absolute", bottom: mapBottomPad, right: 8, zIndex: 1000, transition: "bottom 0.3s",
-          bgcolor: "rgba(13,17,23,0.85)", border: "1px solid #30363d",
-          borderRadius: 1, px: 1.5, py: 0.5, fontFamily: "monospace", fontSize: "0.7rem",
-          color: "text.secondary", pointerEvents: "none",
-        }}>
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: mapBottomPad,
+            right: 8,
+            zIndex: 1000,
+            transition: "bottom 0.3s",
+            bgcolor: "rgba(13,17,23,0.85)",
+            border: "1px solid #30363d",
+            borderRadius: 1,
+            px: 1.5,
+            py: 0.5,
+            fontFamily: "monospace",
+            fontSize: "0.7rem",
+            color: "text.secondary",
+            pointerEvents: "none",
+          }}
+        >
           {cursorLatLon[0].toFixed(5)}, {cursorLatLon[1].toFixed(5)}
           {cursorElevation != null && (
             <span style={{ color: "#4fc3f7", marginLeft: 8 }}>{cursorElevation.toFixed(1)} m</span>
@@ -345,7 +483,10 @@ export default function MapCanvas({
         pendingRadiusM={pendingRadiusM}
         onChangeRadius={setPendingRadiusM}
         onConfirm={confirmRadius}
-        onCancel={() => { setPendingCenter(null); setPendingRadiusM(""); }}
+        onCancel={() => {
+          setPendingCenter(null);
+          setPendingRadiusM("");
+        }}
       />
 
       <MapToolbar
@@ -356,7 +497,11 @@ export default function MapCanvas({
         visibleOverlays={visibleOverlays}
         elevationOpacity={elevationOpacity}
         mapBottomPad={mapBottomPad}
-        onSetPlaceMode={(mode) => { setRulerMode(false); setRulerPoints([]); onSetPlaceMode(mode); }}
+        onSetPlaceMode={(mode) => {
+          setRulerMode(false);
+          setRulerPoints([]);
+          onSetPlaceMode(mode);
+        }}
         onToggleRuler={toggleRuler}
         onToggleRadius={toggleRadiusMode}
         onFit={() => setFitKey((k) => k + 1)}
@@ -364,7 +509,8 @@ export default function MapCanvas({
         onToggleOverlay={(name) =>
           setVisibleOverlays((prev) => {
             const next = new Set(prev);
-            if (next.has(name)) next.delete(name); else next.add(name);
+            if (next.has(name)) next.delete(name);
+            else next.add(name);
             return next;
           })
         }
@@ -372,8 +518,25 @@ export default function MapCanvas({
 
       {/* Active mode status badge — top center */}
       {isActive && (
-        <Box sx={{ position: "absolute", top: 10, left: "50%", transform: "translateX(-50%)", zIndex: 1000, bgcolor: "rgba(22,27,34,0.92)", border: "1px solid #30363d", borderRadius: 2, px: 2, py: 0.75, pointerEvents: "none" }}>
-          <Typography variant="caption" sx={{ color: "#ff9100", fontWeight: 600, fontFamily: "monospace" }}>
+        <Box
+          sx={{
+            position: "absolute",
+            top: 10,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1000,
+            bgcolor: "rgba(22,27,34,0.92)",
+            border: "1px solid #30363d",
+            borderRadius: 2,
+            px: 2,
+            py: 0.75,
+            pointerEvents: "none",
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{ color: "#ff9100", fontWeight: 600, fontFamily: "monospace" }}
+          >
             {statusText}
           </Typography>
         </Box>
@@ -381,8 +544,22 @@ export default function MapCanvas({
 
       {/* Finish Polygon button — bottom center */}
       {polygonDrawPoiIndex !== null && polygonVertices.length >= 3 && (
-        <Box sx={{ position: "absolute", bottom: 60, left: "50%", transform: "translateX(-50%)", zIndex: 1000 }}>
-          <Button variant="contained" size="small" color="success" onClick={onPolygonClose} sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}>
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 60,
+            left: "50%",
+            transform: "translateX(-50%)",
+            zIndex: 1000,
+          }}
+        >
+          <Button
+            variant="contained"
+            size="small"
+            color="success"
+            onClick={onPolygonClose}
+            sx={{ textTransform: "none", fontWeight: 600, borderRadius: 2 }}
+          >
             ✓ Finish Polygon ({polygonVertices.length} vertices)
           </Button>
         </Box>

@@ -15,17 +15,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.upload import router as upload_router
-from api.plan import router as plan_router
-from api.terrain import router as terrain_router
-from api.pdf import router as pdf_router
+import config
 from api.altitude_edit import router as altitude_edit_router
+from api.dashboard import router as dashboard_router
 from api.editor_data import router as editor_data_router
 from api.missions import router as missions_router
+from api.pdf import router as pdf_router
+from api.plan import router as plan_router
 from api.presets import router as presets_router
 from api.settings import router as settings_router
-from api.dashboard import router as dashboard_router
-import config
+from api.terrain import router as terrain_router
+from api.upload import router as upload_router
 from session import prune_expired_sessions
 
 logging.basicConfig(

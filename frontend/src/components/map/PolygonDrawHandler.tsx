@@ -9,7 +9,12 @@ interface PolygonDrawHandlerProps {
 }
 
 /** Captures map clicks and double-clicks during polygon drawing mode. */
-export function PolygonDrawHandler({ onVertex, onClose, vertexCount, onNotEnoughVertices }: PolygonDrawHandlerProps): null {
+export function PolygonDrawHandler({
+  onVertex,
+  onClose,
+  vertexCount,
+  onNotEnoughVertices,
+}: PolygonDrawHandlerProps): null {
   useMapEvents({
     click(e) {
       onVertex({ lat: e.latlng.lat, lon: e.latlng.lng });

@@ -22,7 +22,10 @@ export function useTutorial(): TutorialAPI {
 
   const next = useCallback(() => {
     setStepIndex((i) => {
-      if (i >= STEPS.length - 1) { setActive(false); return 0; }
+      if (i >= STEPS.length - 1) {
+        setActive(false);
+        return 0;
+      }
       return i + 1;
     });
   }, []);

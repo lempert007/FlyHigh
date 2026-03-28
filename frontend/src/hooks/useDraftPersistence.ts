@@ -57,12 +57,16 @@ export function useDraftPersistence(
         ...p,
         id: (p as { id?: string }).id ?? crypto.randomUUID(),
       }));
-      if (mounted) setDraftInfo({ age: formatAge(draft.savedAt), raw: { ...draft, pois: poisWithIds } });
+      if (mounted)
+        setDraftInfo({ age: formatAge(draft.savedAt), raw: { ...draft, pois: poisWithIds } });
     } catch {
       /* corrupt data — ignore */
     }
-    return () => { mounted = false; };
-  }, []); // intentionally runs once on mount
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally runs once on mount — re-checking on enabled change is not desired
 
   // Auto-save on debounce whenever meaningful state changes
   const hasContent = !!(state.start || state.waypoints.length || state.pois.length);
@@ -80,7 +84,7 @@ export function useDraftPersistence(
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
-  }, [state, hasContent]);
+  }, [state, hasContent, enabled]);
 
   const restoreDraft = useCallback(() => {
     if (!draftInfo) return;

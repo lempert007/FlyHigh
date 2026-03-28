@@ -1,7 +1,14 @@
 import { useState } from "react";
 import {
-  Button, CircularProgress, Dialog, DialogActions,
-  DialogContent, DialogTitle, Stack, TextField, Typography,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Stack,
+  TextField,
+  Typography,
 } from "@mui/material";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import { downloadPdfReport, downloadBlob } from "../../api";
@@ -14,7 +21,10 @@ interface PdfReportDialogProps {
 }
 
 export default function PdfReportDialog({
-  open, onClose, sessionId, missionName,
+  open,
+  onClose,
+  sessionId,
+  missionName,
 }: PdfReportDialogProps) {
   const [operatorName, setOperatorName] = useState("");
   const [organization, setOrganization] = useState("");
@@ -80,7 +90,9 @@ export default function PdfReportDialog({
           variant="contained"
           onClick={handleGenerate}
           disabled={loading}
-          startIcon={loading ? <CircularProgress size={14} color="inherit" /> : <PictureAsPdfIcon />}
+          startIcon={
+            loading ? <CircularProgress size={14} color="inherit" /> : <PictureAsPdfIcon />
+          }
           size="small"
           sx={{ minWidth: 130 }}
         >

@@ -1,5 +1,12 @@
 import { useState, useCallback } from "react";
-import type { LatLon, Waypoint, Poi, FlightConfig, RouteFileEnvelope, TiffSelection } from "../types/mission";
+import type {
+  LatLon,
+  Waypoint,
+  Poi,
+  FlightConfig,
+  RouteFileEnvelope,
+  TiffSelection,
+} from "../types/mission";
 
 interface MissionData {
   start: LatLon | null;
@@ -28,7 +35,10 @@ interface UseRouteIOReturn {
   handleLoadRoute: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-export function useRouteIO(data: MissionData, onLoad: (route: LoadedRoute) => void | Promise<void>): UseRouteIOReturn {
+export function useRouteIO(
+  data: MissionData,
+  onLoad: (route: LoadedRoute) => void | Promise<void>
+): UseRouteIOReturn {
   const [loadRouteError, setLoadRouteError] = useState<string | null>(null);
   const [loadRouteSnack, setLoadRouteSnack] = useState<string | null>(null);
 
@@ -41,7 +51,9 @@ export function useRouteIO(data: MissionData, onLoad: (route: LoadedRoute) => vo
     const canonical = JSON.stringify(payload);
     const hashBuf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
     const hash = Array.from(new Uint8Array(hashBuf))
-      .map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 16);
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("")
+      .slice(0, 16);
 
     const envelope: RouteFileEnvelope = {
       version: 1,
@@ -63,41 +75,57 @@ export function useRouteIO(data: MissionData, onLoad: (route: LoadedRoute) => vo
     URL.revokeObjectURL(url);
   }, [data]);
 
-  const handleLoadRoute = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setLoadRouteError(null);
+  const handleLoadRoute = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setLoadRouteError(null);
 
-    const reader = new FileReader();
-    reader.onerror = () => setLoadRouteError("Failed to read file.");
-    reader.onload = (ev) => {
-      try {
-        const raw: unknown = JSON.parse(ev.target?.result as string);
-        const isEnvelope = (raw as RouteFileEnvelope).version === 1 && "route" in (raw as object);
-        const envelope = isEnvelope ? (raw as RouteFileEnvelope) : null;
-        const routeData = envelope ? envelope.route : raw as LoadedRoute;
-        const name = envelope?.name ?? "";
-        const tiff_selections = envelope?.tiff_selections;
+      const reader = new FileReader();
+      reader.onerror = () => setLoadRouteError("Failed to read file.");
+      reader.onload = (ev) => {
+        try {
+          const raw: unknown = JSON.parse(ev.target?.result as string);
+          const isEnvelope = (raw as RouteFileEnvelope).version === 1 && "route" in (raw as object);
+          const envelope = isEnvelope ? (raw as RouteFileEnvelope) : null;
+          const routeData = envelope ? envelope.route : (raw as LoadedRoute);
+          const name = envelope?.name ?? "";
+          const tiff_selections = envelope?.tiff_selections;
 
-        // Assign stable IDs to pois loaded from file (may predate the id field)
-        const poisWithIds = routeData.pois?.map((p) => ({
-          ...p,
-          id: (p as { id?: string }).id ?? crypto.randomUUID(),
-        })) as typeof routeData.pois;
-        onLoad({ ...routeData, pois: poisWithIds, start: routeData.start ?? undefined, name, tiff_selections });
+          // Assign stable IDs to pois loaded from file (may predate the id field)
+          const poisWithIds = routeData.pois?.map((p) => ({
+            ...p,
+            id: (p as { id?: string }).id ?? crypto.randomUUID(),
+          })) as typeof routeData.pois;
+          onLoad({
+            ...routeData,
+            pois: poisWithIds,
+            start: routeData.start ?? undefined,
+            name,
+            tiff_selections,
+          });
 
-        const wpCount = routeData.waypoints?.length ?? 0;
-        const poiCount = (routeData as LoadedRoute).pois?.length ?? 0;
-        setLoadRouteSnack(
-          `Route loaded${name ? `: "${name}"` : ""} — ${wpCount} waypoint${wpCount !== 1 ? "s" : ""}, ${poiCount} POI${poiCount !== 1 ? "s" : ""}`
-        );
-      } catch {
-        setLoadRouteError("Could not load route file — invalid or unsupported format.");
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-  }, [onLoad]);
+          const wpCount = routeData.waypoints?.length ?? 0;
+          const poiCount = (routeData as LoadedRoute).pois?.length ?? 0;
+          setLoadRouteSnack(
+            `Route loaded${name ? `: "${name}"` : ""} — ${wpCount} waypoint${wpCount !== 1 ? "s" : ""}, ${poiCount} POI${poiCount !== 1 ? "s" : ""}`
+          );
+        } catch {
+          setLoadRouteError("Could not load route file — invalid or unsupported format.");
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    },
+    [onLoad]
+  );
 
-  return { loadRouteError, loadRouteSnack, clearLoadRouteError, clearLoadRouteSnack, handleSaveRoute, handleLoadRoute };
+  return {
+    loadRouteError,
+    loadRouteSnack,
+    clearLoadRouteError,
+    clearLoadRouteSnack,
+    handleSaveRoute,
+    handleLoadRoute,
+  };
 }

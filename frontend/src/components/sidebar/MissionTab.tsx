@@ -1,7 +1,17 @@
 import React, { useState } from "react";
 import {
-  Alert, Box, Button, CircularProgress, IconButton,
-  Menu, MenuItem, Paper, Stack, TextField, Tooltip, Typography,
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -14,7 +24,15 @@ import RouteIcon from "@mui/icons-material/Route";
 import GpsFixedIcon from "@mui/icons-material/GpsFixed";
 import CloseIcon from "@mui/icons-material/Close";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import type { LatLon, Waypoint, Poi, InteractionState, InteractionMode, UploadResult, MissionStatus } from "../../types/mission";
+import type {
+  LatLon,
+  Waypoint,
+  Poi,
+  InteractionState,
+  InteractionMode,
+  UploadResult,
+  MissionStatus,
+} from "../../types/mission";
 import type { LiveEstimates } from "../../hooks/useLiveEstimates";
 import UploadPanel from "../UploadPanel";
 import { StartPointSection } from "./StartPointSection";
@@ -106,7 +124,13 @@ function CardHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
       <Box sx={{ color: "text.disabled", display: "flex", flexShrink: 0 }}>{icon}</Box>
       <Typography
         variant="caption"
-        sx={{ textTransform: "uppercase", letterSpacing: "0.07em", fontSize: "0.67rem", fontWeight: 700, color: "text.disabled" }}
+        sx={{
+          textTransform: "uppercase",
+          letterSpacing: "0.07em",
+          fontSize: "0.67rem",
+          fontWeight: 700,
+          color: "text.disabled",
+        }}
       >
         {label}
       </Typography>
@@ -116,17 +140,47 @@ function CardHeader({ icon, label }: { icon: React.ReactNode; label: string }) {
 
 export function MissionTab(props: MissionTabProps) {
   const {
-    missionName, missionNotes, onNameChange, onNotesChange,
-    onSave, isSaving, saveError, isDirty,
-    onExport, onLoad, loadRouteError, onClearLoadRouteError,
-    canUndo, canRedo, onUndo, onRedo,
-    status, onStatusChange, onBack,
-    uploadResult, elevationErrors, onUploadSuccess, onUploadClear,
-    takeoffMode, takeoffAltM, onTakeoffModeChange, onTakeoffAltChange,
-    start, waypoints, pois, interaction,
-    onSetPlaceMode, onRemoveWaypoint, onWaypointNameChange,
-    onPoiChange, onPoiRemove, onPoiActivatePlace, onActivatePolygonDraw,
-    onPoiDragStart, onPoiDrop, onAddPoi,
+    missionName,
+    missionNotes,
+    onNameChange,
+    onNotesChange,
+    onSave,
+    isSaving,
+    saveError,
+    isDirty,
+    onExport,
+    onLoad,
+    loadRouteError,
+    onClearLoadRouteError,
+    canUndo,
+    canRedo,
+    onUndo,
+    onRedo,
+    status,
+    onStatusChange,
+    onBack,
+    uploadResult,
+    elevationErrors,
+    onUploadSuccess,
+    onUploadClear,
+    takeoffMode,
+    takeoffAltM,
+    onTakeoffModeChange,
+    onTakeoffAltChange,
+    start,
+    waypoints,
+    pois,
+    interaction,
+    onSetPlaceMode,
+    onRemoveWaypoint,
+    onWaypointNameChange,
+    onPoiChange,
+    onPoiRemove,
+    onPoiActivatePlace,
+    onActivatePolygonDraw,
+    onPoiDragStart,
+    onPoiDrop,
+    onAddPoi,
     liveEstimates,
   } = props;
 
@@ -142,7 +196,9 @@ export function MissionTab(props: MissionTabProps) {
         </Alert>
       )}
       {saveError && (
-        <Alert severity="error" sx={{ py: 0.5 }}>{saveError}</Alert>
+        <Alert severity="error" sx={{ py: 0.5 }}>
+          {saveError}
+        </Alert>
       )}
 
       {/* Mission Details */}
@@ -155,16 +211,30 @@ export function MissionTab(props: MissionTabProps) {
             </IconButton>
           </Tooltip>
           <Box sx={{ flex: 1 }} />
-          <Tooltip title="Undo (Ctrl+Z)"><span>
-            <IconButton size="small" onClick={onUndo} disabled={!canUndo} sx={{ color: "text.disabled" }}>
-              <UndoIcon fontSize="small" />
-            </IconButton>
-          </span></Tooltip>
-          <Tooltip title="Redo (Ctrl+Y)"><span>
-            <IconButton size="small" onClick={onRedo} disabled={!canRedo} sx={{ color: "text.disabled" }}>
-              <RedoIcon fontSize="small" />
-            </IconButton>
-          </span></Tooltip>
+          <Tooltip title="Undo (Ctrl+Z)">
+            <span>
+              <IconButton
+                size="small"
+                onClick={onUndo}
+                disabled={!canUndo}
+                sx={{ color: "text.disabled" }}
+              >
+                <UndoIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Redo (Ctrl+Y)">
+            <span>
+              <IconButton
+                size="small"
+                onClick={onRedo}
+                disabled={!canRedo}
+                sx={{ color: "text.disabled" }}
+              >
+                <RedoIcon fontSize="small" />
+              </IconButton>
+            </span>
+          </Tooltip>
           <Tooltip title="Export to JSON file">
             <IconButton size="small" onClick={onExport} sx={{ color: "text.disabled" }}>
               <DownloadIcon fontSize="small" />
@@ -172,10 +242,16 @@ export function MissionTab(props: MissionTabProps) {
           </Tooltip>
           {/* Status dot — sits right beside the folder icon */}
           <Tooltip title={`Status: ${STATUS_OPTIONS.find((o) => o.value === status)?.label}`}>
-            <IconButton size="small" onClick={(e) => setStatusAnchor(e.currentTarget)} sx={{ p: 0.625 }}>
+            <IconButton
+              size="small"
+              onClick={(e) => setStatusAnchor(e.currentTarget)}
+              sx={{ p: 0.625 }}
+            >
               <Box
                 sx={{
-                  width: 10, height: 10, borderRadius: "50%",
+                  width: 10,
+                  height: 10,
+                  borderRadius: "50%",
                   bgcolor: statusColor,
                   boxShadow: `0 0 6px ${statusColor}99`,
                   transition: "box-shadow 0.15s",
@@ -190,8 +266,10 @@ export function MissionTab(props: MissionTabProps) {
             onClose={() => setStatusAnchor(null)}
             PaperProps={{
               sx: {
-                bgcolor: "#161b22", border: "1px solid #21262d",
-                boxShadow: "0 8px 32px rgba(0,0,0,0.5)", minWidth: 130,
+                bgcolor: "#161b22",
+                border: "1px solid #21262d",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                minWidth: 130,
               },
             }}
           >
@@ -199,10 +277,21 @@ export function MissionTab(props: MissionTabProps) {
               <MenuItem
                 key={opt.value}
                 selected={opt.value === status}
-                onClick={() => { onStatusChange(opt.value); setStatusAnchor(null); }}
+                onClick={() => {
+                  onStatusChange(opt.value);
+                  setStatusAnchor(null);
+                }}
                 sx={{ fontSize: "0.8rem", gap: 1.5 }}
               >
-                <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: opt.color, flexShrink: 0 }} />
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    bgcolor: opt.color,
+                    flexShrink: 0,
+                  }}
+                />
                 {opt.label}
               </MenuItem>
             ))}
@@ -234,10 +323,11 @@ export function MissionTab(props: MissionTabProps) {
                 disabled={isSaving}
                 sx={{ color: isDirty ? "primary.main" : "text.disabled" }}
               >
-                {isSaving
-                  ? <CircularProgress size={16} color="inherit" />
-                  : <SaveIcon fontSize="small" />
-                }
+                {isSaving ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <SaveIcon fontSize="small" />
+                )}
               </IconButton>
             </span>
           </Tooltip>
@@ -260,7 +350,12 @@ export function MissionTab(props: MissionTabProps) {
       {/* Terrain */}
       <Paper elevation={0} sx={cardSx(!!uploadResult)}>
         <CardHeader icon={<TerrainIcon sx={{ fontSize: 15 }} />} label="Terrain" />
-        <UploadPanel uploadResult={uploadResult} onUploadSuccess={onUploadSuccess} onClear={onUploadClear} elevationErrors={elevationErrors} />
+        <UploadPanel
+          uploadResult={uploadResult}
+          onUploadSuccess={onUploadSuccess}
+          onClear={onUploadClear}
+          elevationErrors={elevationErrors}
+        />
       </Paper>
 
       {/* Home point */}
@@ -297,18 +392,27 @@ export function MissionTab(props: MissionTabProps) {
                   inputProps={{ maxLength: 30 }}
                   sx={{ flex: 1, "& .MuiInputBase-input": { fontSize: "0.78rem", py: 0.6 } }}
                 />
-                <IconButton size="small" onClick={() => onRemoveWaypoint(i)} sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: "error.main" } }}>
+                <IconButton
+                  size="small"
+                  onClick={() => onRemoveWaypoint(i)}
+                  sx={{ p: 0.25, color: "text.disabled", "&:hover": { color: "error.main" } }}
+                >
                   <CloseIcon sx={{ fontSize: 14 }} />
                 </IconButton>
               </Stack>
-              <Typography variant="caption" color="text.disabled" sx={{ pl: 0.5, fontFamily: "monospace", fontSize: "0.65rem" }}>
+              <Typography
+                variant="caption"
+                color="text.disabled"
+                sx={{ pl: 0.5, fontFamily: "monospace", fontSize: "0.65rem" }}
+              >
                 {Math.abs(wp.lat).toFixed(5)}°{wp.lat >= 0 ? "N" : "S"}&nbsp;
                 {Math.abs(wp.lon).toFixed(5)}°{wp.lon >= 0 ? "E" : "W"}
               </Typography>
             </Stack>
           ))}
           <Button
-            size="small" variant="outlined"
+            size="small"
+            variant="outlined"
             onClick={() => onSetPlaceMode("waypoint" as InteractionMode)}
             sx={{ textTransform: "none", fontSize: "0.75rem", alignSelf: "flex-start" }}
           >
@@ -318,8 +422,14 @@ export function MissionTab(props: MissionTabProps) {
       </Paper>
 
       {/* POIs */}
-      <Paper elevation={0} sx={cardSx(pois.length > 0, placeMode === "poi" || interaction.mode === "polygon")}>
-        <CardHeader icon={<GpsFixedIcon sx={{ fontSize: 15 }} />} label={pois.length > 0 ? `POIs  (${pois.length})` : "POIs"} />
+      <Paper
+        elevation={0}
+        sx={cardSx(pois.length > 0, placeMode === "poi" || interaction.mode === "polygon")}
+      >
+        <CardHeader
+          icon={<GpsFixedIcon sx={{ fontSize: 15 }} />}
+          label={pois.length > 0 ? `POIs  (${pois.length})` : "POIs"}
+        />
         <PoiSection
           pois={pois}
           onPoiChange={onPoiChange}

@@ -20,14 +20,19 @@ export function MapViolationLayer({ violations }: MapViolationLayerProps) {
   return (
     <>
       {violations.map((v, i) => (
-        <Marker
-          key={`viol-${i}`}
-          position={[v.lat, v.lon]}
-          icon={makeViolationIcon(v.category)}
-        >
+        <Marker key={`viol-${i}`} position={[v.lat, v.lon]} icon={makeViolationIcon(v.category)}>
           <Popup>
             <div style={{ fontFamily: "sans-serif", fontSize: 12, minWidth: 160 }}>
-              <b style={{ color: v.category === "safety" ? "#ff5252" : v.category === "product_poi" ? "#ff9100" : "#ffd600" }}>
+              <b
+                style={{
+                  color:
+                    v.category === "safety"
+                      ? "#ff5252"
+                      : v.category === "product_poi"
+                        ? "#ff9100"
+                        : "#ffd600",
+                }}
+              >
                 {KIND_LABEL[v.kind] ?? v.kind}
               </b>
               <div style={{ marginTop: 4, color: "#ccc" }}>{v.description}</div>

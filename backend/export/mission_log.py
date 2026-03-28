@@ -5,7 +5,7 @@ detailed safety violation records.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 
@@ -47,7 +47,7 @@ def generate_mission_log(
     SEP = "=" * 62
     lines: list[str] = []
 
-    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines += [SEP, "  FlyHigh — Mission Log", f"  Generated: {now}"]
     if mission_name:
         lines.append(f"  Mission    : {mission_name}")
@@ -65,11 +65,17 @@ def generate_mission_log(
     for i, poi in enumerate(pois):
         m = poi.maneuver
         if m.polygon:
-            detail = f"{m.type} polygon ({len(m.polygon)} vertices) spacing={m.sweep_spacing_m:.0f} m"
+            detail = (
+                f"{m.type} polygon ({len(m.polygon)} vertices) spacing={m.sweep_spacing_m:.0f} m"
+            )
         else:
-            detail = f"{m.type} {m.width_m:.0f}×{m.height_m:.0f} m spacing={m.sweep_spacing_m:.0f} m"
+            detail = (
+                f"{m.type} {m.width_m:.0f}×{m.height_m:.0f} m spacing={m.sweep_spacing_m:.0f} m"
+            )
         name_str = f" ({poi.name})" if getattr(poi, "name", None) else ""
-        lines.append(f"  POI {i + 1:<3}{name_str}: {poi.point.lat:.6f}, {poi.point.lon:.6f}  [{detail}]")
+        lines.append(
+            f"  POI {i + 1:<3}{name_str}: {poi.point.lat:.6f}, {poi.point.lon:.6f}  [{detail}]"
+        )
     lines.append(f"  Landing : {landing.lat:.6f}, {landing.lon:.6f}")
 
     # ── Statistics ────────────────────────────────────────────────────────────
@@ -89,7 +95,11 @@ def generate_mission_log(
     lines += ["", "[ FLIGHT CONFIG ]"]
     lines.append(f"  AGL range      : {flight_cfg.min_agl_m} – {flight_cfg.max_agl_m} m")
     lines.append(f"  Safety bubble  : {flight_cfg.point_radius_m} m radius (hard)")
-    cam_status = f"{flight_cfg.max_surface_radius_m} m radius (hard)" if flight_cfg.max_surface_radius_m > 0 else "disabled"
+    cam_status = (
+        f"{flight_cfg.max_surface_radius_m} m radius (hard)"
+        if flight_cfg.max_surface_radius_m > 0
+        else "disabled"
+    )
     lines.append(f"  Camera range   : {cam_status}")
     lines.append(f"  Cruise speed   : {flight_cfg.cruise_speed_ms} m/s")
     lines.append(f"  Climb rate     : {flight_cfg.climb_rate_ms} m/s")

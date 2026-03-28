@@ -14,14 +14,24 @@ interface PlanButtonProps {
   onClearError: () => void;
 }
 
-export function PlanButton({ canPlan, isPlanning, planningStep, planError, sessionId, hasStart, hasPois, onPlan, onClearError }: PlanButtonProps) {
+export function PlanButton({
+  canPlan,
+  isPlanning,
+  planningStep,
+  planError,
+  sessionId,
+  hasStart,
+  hasPois,
+  onPlan,
+  onClearError,
+}: PlanButtonProps) {
   const tooltip = !sessionId
     ? "Upload terrain files first"
     : !hasStart
-    ? "Set a home point on the map"
-    : !hasPois
-    ? "Add at least one POI"
-    : "";
+      ? "Set a home point on the map"
+      : !hasPois
+        ? "Add at least one POI"
+        : "";
 
   return (
     <>
@@ -40,7 +50,7 @@ export function PlanButton({ canPlan, isPlanning, planningStep, planError, sessi
                   animation: "planReady 2s ease-in-out infinite",
                   "@keyframes planReady": {
                     "0%, 100%": { boxShadow: "0 0 0 0 rgba(30,144,255,0.4)" },
-                    "50%":       { boxShadow: "0 0 0 8px rgba(30,144,255,0)" },
+                    "50%": { boxShadow: "0 0 0 8px rgba(30,144,255,0)" },
                   },
                 }),
               }}

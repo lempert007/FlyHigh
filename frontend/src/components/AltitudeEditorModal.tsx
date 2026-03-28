@@ -13,8 +13,16 @@
 
 import { useState, useCallback, useMemo } from "react";
 import {
-  Box, Button, CircularProgress, Dialog, DialogContent, DialogTitle,
-  IconButton, Stack, Tooltip, Typography,
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Stack,
+  Tooltip,
+  Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import UndoIcon from "@mui/icons-material/Undo";
@@ -27,8 +35,13 @@ import { applyAltitudeEdit, applyFolderAltitudeEdit } from "../api";
 import type { AltNode } from "../utils/altitudeEditorUtils";
 import type { PlanMeta } from "../types/mission";
 import {
-  AltitudeChart, makeScales, clientToSvg,
-  PT, CHART_H, PL, CHART_W,
+  AltitudeChart,
+  makeScales,
+  clientToSvg,
+  PT,
+  CHART_H,
+  PL,
+  CHART_W,
 } from "./altitude-editor/AltitudeChart";
 import type { DragState, SegmentBar } from "./altitude-editor/AltitudeChart";
 
@@ -46,25 +59,41 @@ interface AltitudeEditorModalProps {
 }
 
 export default function AltitudeEditorModal({
-  open, onClose, sessionId, folder, minAgl, maxAgl, onApplied,
+  open,
+  onClose,
+  sessionId,
+  folder,
+  minAgl,
+  maxAgl,
+  onApplied,
 }: AltitudeEditorModalProps) {
   const {
-    loading, loadError, editorData,
-    nodes, reconAlt, validation, minBand, maxBand,
+    loading,
+    loadError,
+    editorData,
+    nodes,
+    reconAlt,
+    validation,
+    minBand,
+    maxBand,
     isDirty,
-    dragNode, dragTwoNodes, insertNode, removeNode, reset,
+    dragNode,
+    dragTwoNodes,
+    insertNode,
+    removeNode,
+    reset,
   } = useAltitudeEditor(sessionId, folder ?? null, open, minAgl, maxAgl);
 
-  const [dragState, setDragState]               = useState<DragState | null>(null);
+  const [dragState, setDragState] = useState<DragState | null>(null);
   const [hoveredSegmentKey, setHoveredSegmentKey] = useState<string | null>(null);
-  const [hoveredNodeId, setHoveredNodeId]         = useState<string | null>(null);
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
-  const [applying, setApplying]     = useState(false);
+  const [applying, setApplying] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
 
   // ── Derived stats ──────────────────────────────────────────────────────────
-  const belowCount   = validation.filter((v) => v === "below").length;
-  const aboveCount   = validation.filter((v) => v === "above").length;
+  const belowCount = validation.filter((v) => v === "below").length;
+  const aboveCount = validation.filter((v) => v === "above").length;
   const minClearance = editorData
     ? Math.min(...reconAlt.map((a, i) => a - editorData.terrain[i]))
     : null;
@@ -73,7 +102,7 @@ export default function AltitudeEditorModal({
   const svgScales = useMemo(() => {
     if (!editorData || editorData.wps.length === 0) return null;
     const totalDist = editorData.cumDists[editorData.cumDists.length - 1] || 1;
-    const origAlts  = editorData.wps.map((w) => w.alt_m);
+    const origAlts = editorData.wps.map((w) => w.alt_m);
     return { ...makeScales(totalDist, origAlts, editorData.terrain, maxAgl), totalDist };
   }, [editorData, maxAgl]);
 
@@ -82,9 +111,14 @@ export default function AltitudeEditorModal({
     (e: React.PointerEvent<SVGCircleElement>, nodeId: string) => {
       if (!svgScales) return;
       (e.currentTarget as SVGCircleElement).setPointerCapture(e.pointerId);
-      setDragState({ type: "handle", id: nodeId, altMin: svgScales.altMin, altRange: svgScales.altRange });
+      setDragState({
+        type: "handle",
+        id: nodeId,
+        altMin: svgScales.altMin,
+        altRange: svgScales.altRange,
+      });
     },
-    [svgScales],
+    [svgScales]
   );
 
   // ── Segment drag ───────────────────────────────────────────────────────────
@@ -102,16 +136,21 @@ export default function AltitudeEditorModal({
       (e.currentTarget as SVGLineElement).setPointerCapture(e.pointerId);
       setDragState({
         type: "segment",
-        idA: seg.idA, idB: seg.idB,
-        initialAltA: nodeA.alt_m, initialAltB: nodeB.alt_m,
-        startSvgY, hasMoved: false,
-        distA: seg.distA, distB: seg.distB,
+        idA: seg.idA,
+        idB: seg.idB,
+        initialAltA: nodeA.alt_m,
+        initialAltB: nodeB.alt_m,
+        startSvgY,
+        hasMoved: false,
+        distA: seg.distA,
+        distB: seg.distB,
         totalDist: svgScales.totalDist,
-        altMin: svgScales.altMin, altRange: svgScales.altRange,
+        altMin: svgScales.altMin,
+        altRange: svgScales.altRange,
         isDraggable: seg.isDraggable,
       });
     },
-    [svgScales, nodes],
+    [svgScales, nodes]
   );
 
   // ── Pointer move (handles both drag types) ─────────────────────────────────
@@ -127,15 +166,17 @@ export default function AltitudeEditorModal({
       } else if (dragState.isDraggable) {
         const deltaAlt = -((y - dragState.startSvgY) / CHART_H) * dragState.altRange;
         if (!dragState.hasMoved && Math.abs(y - dragState.startSvgY) > 5) {
-          setDragState((prev) => prev ? { ...prev, hasMoved: true } : prev);
+          setDragState((prev) => (prev ? { ...prev, hasMoved: true } : prev));
         }
         dragTwoNodes(
-          dragState.idA, dragState.initialAltA + deltaAlt,
-          dragState.idB, dragState.initialAltB + deltaAlt,
+          dragState.idA,
+          dragState.initialAltA + deltaAlt,
+          dragState.idB,
+          dragState.initialAltB + deltaAlt
         );
       }
     },
-    [dragState, editorData, dragNode, dragTwoNodes],
+    [dragState, editorData, dragNode, dragTwoNodes]
   );
 
   // ── Pointer up (handle release or segment click/release) ───────────────────
@@ -150,7 +191,7 @@ export default function AltitudeEditorModal({
       }
       setDragState(null);
     },
-    [dragState, insertNode],
+    [dragState, insertNode]
   );
 
   // ── Double-click removes inserted nodes ───────────────────────────────────
@@ -158,7 +199,7 @@ export default function AltitudeEditorModal({
     (id: string, type: AltNode["type"]) => {
       if (type === "inserted") removeNode(id);
     },
-    [removeNode],
+    [removeNode]
   );
 
   // ── Apply & re-plan safety ─────────────────────────────────────────────────
@@ -188,22 +229,38 @@ export default function AltitudeEditorModal({
       PaperProps={{ sx: { bgcolor: "#0d1117", border: "1px solid #30363d", borderRadius: 2 } }}
     >
       <DialogTitle
-        sx={{ display: "flex", alignItems: "center", gap: 1, pb: 1, borderBottom: "1px solid #21262d" }}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          pb: 1,
+          borderBottom: "1px solid #21262d",
+        }}
       >
         <Box sx={{ flex: 1 }}>
           <Typography variant="subtitle1" fontWeight={700} color="text.primary">
             Manual Altitude Editor
           </Typography>
           <Typography variant="caption" color="text.disabled">
-            Drag a segment bar to shift both ends · drag a handle for fine control · click a segment to add a point · double-click an added point to remove it
+            Drag a segment bar to shift both ends · drag a handle for fine control · click a segment
+            to add a point · double-click an added point to remove it
           </Typography>
         </Box>
         <Tooltip title="Reset to algorithm output">
           <span>
             <Button
-              size="small" variant="outlined" startIcon={<UndoIcon />}
-              onClick={reset} disabled={!isDirty || loading}
-              sx={{ textTransform: "none", fontSize: "0.72rem", mr: 1, borderColor: "#30363d", color: "text.secondary" }}
+              size="small"
+              variant="outlined"
+              startIcon={<UndoIcon />}
+              onClick={reset}
+              disabled={!isDirty || loading}
+              sx={{
+                textTransform: "none",
+                fontSize: "0.72rem",
+                mr: 1,
+                borderColor: "#30363d",
+                color: "text.secondary",
+              }}
             >
               Reset
             </Button>
@@ -218,13 +275,21 @@ export default function AltitudeEditorModal({
         {/* Chart area */}
         <Box
           sx={{
-            bgcolor: "#161b22", border: "1px solid #21262d", borderRadius: 1,
-            p: 1, minHeight: 420, display: "flex", alignItems: "center", justifyContent: "center",
+            bgcolor: "#161b22",
+            border: "1px solid #21262d",
+            borderRadius: 1,
+            p: 1,
+            minHeight: 420,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           {loading && <CircularProgress size={32} />}
           {loadError && (
-            <Typography color="error" variant="body2">{loadError}</Typography>
+            <Typography color="error" variant="body2">
+              {loadError}
+            </Typography>
           )}
           {!loading && !loadError && editorData && (
             <AltitudeChart
@@ -257,15 +322,21 @@ export default function AltitudeEditorModal({
             {belowCount === 0 && aboveCount === 0 ? (
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 <CheckCircleIcon sx={{ color: "#00e676", fontSize: 16 }} />
-                <Typography variant="caption" color="#00e676">All segments within AGL band</Typography>
+                <Typography variant="caption" color="#00e676">
+                  All segments within AGL band
+                </Typography>
               </Stack>
             ) : (
               <Stack direction="row" alignItems="center" spacing={0.5}>
-                <WarningAmberIcon sx={{ color: belowCount > 0 ? "#ff5252" : "#ff9100", fontSize: 16 }} />
+                <WarningAmberIcon
+                  sx={{ color: belowCount > 0 ? "#ff5252" : "#ff9100", fontSize: 16 }}
+                />
                 <Typography variant="caption" color={belowCount > 0 ? "#ff5252" : "#ff9100"}>
-                  {belowCount > 0 && `${belowCount} point${belowCount > 1 ? "s" : ""} below min AGL`}
+                  {belowCount > 0 &&
+                    `${belowCount} point${belowCount > 1 ? "s" : ""} below min AGL`}
                   {belowCount > 0 && aboveCount > 0 && "  ·  "}
-                  {aboveCount > 0 && `${aboveCount} point${aboveCount > 1 ? "s" : ""} above max AGL`}
+                  {aboveCount > 0 &&
+                    `${aboveCount} point${aboveCount > 1 ? "s" : ""} above max AGL`}
                 </Typography>
               </Stack>
             )}
@@ -278,13 +349,24 @@ export default function AltitudeEditorModal({
         )}
 
         {applyError && (
-          <Typography variant="caption" color="error">{applyError}</Typography>
+          <Typography variant="caption" color="error">
+            {applyError}
+          </Typography>
         )}
 
         {/* Footer actions */}
-        <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ pt: 0.5, borderTop: "1px solid #21262d" }}>
-          <Button variant="outlined" onClick={onClose} size="small"
-            sx={{ textTransform: "none", borderColor: "#30363d", color: "text.secondary" }}>
+        <Stack
+          direction="row"
+          justifyContent="flex-end"
+          spacing={1}
+          sx={{ pt: 0.5, borderTop: "1px solid #21262d" }}
+        >
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            size="small"
+            sx={{ textTransform: "none", borderColor: "#30363d", color: "text.secondary" }}
+          >
             Close
           </Button>
           <Button

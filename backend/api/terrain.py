@@ -3,6 +3,7 @@
 Returns a colorized PNG preview of the terrain for a given session file.
 Uses only rasterio + numpy + stdlib — no new dependencies required.
 """
+
 from __future__ import annotations
 
 import struct
@@ -20,13 +21,16 @@ router = APIRouter()
 _MAX_PX = 512  # max dimension of the output image
 
 # 5-stop terrain colormap: R, G, B, A
-_COLORMAP = np.array([
-    [ 70, 130, 180, 210],   # steel blue  — low / sea level
-    [ 34, 139,  34, 210],   # forest green
-    [210, 180, 140, 210],   # tan / plains
-    [139,  90,  43, 210],   # sienna brown / highlands
-    [255, 255, 255, 210],   # white — peaks
-], dtype=np.float32)
+_COLORMAP = np.array(
+    [
+        [70, 130, 180, 210],  # steel blue  — low / sea level
+        [34, 139, 34, 210],  # forest green
+        [210, 180, 140, 210],  # tan / plains
+        [139, 90, 43, 210],  # sienna brown / highlands
+        [255, 255, 255, 210],  # white — peaks
+    ],
+    dtype=np.float32,
+)
 
 
 def _colorize(normalized: np.ndarray) -> np.ndarray:
@@ -71,9 +75,7 @@ def get_elevation_point(session_id: str, lat: float, lon: float) -> dict:
     ds = next(iter(sess.files.values())).dataset
     try:
         val = float(next(ds.sample([(lon, lat)]))[0])
-        if ds.nodata is not None and val == ds.nodata:
-            val = None  # type: ignore[assignment]
-        elif not (-1e6 < val < 1e6):
+        if ds.nodata is not None and val == ds.nodata or not (-1e6 < val < 1e6):
             val = None  # type: ignore[assignment]
     except Exception:
         val = None  # type: ignore[assignment]

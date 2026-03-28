@@ -29,4 +29,37 @@ dev-dependencies = [
     "httpx>=0.27.0",
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
+    "ruff>=0.8.0",
+    "pre-commit>=3.7.0",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "E402",   # module-level import not at top — some modules import at bottom intentionally
+    "B008",   # function call in default arg — FastAPI Depends() pattern
+    "B904",   # raise-without-from inside except — pre-existing pattern, fix incrementally
+    "B905",   # zip() without strict= — pre-existing pattern
+    "SIM105", # use contextlib.suppress — opinionated
+    "SIM108", # ternary over if-else — opinionated
+    "UP042",  # replace StrEnum — requires refactoring
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "api", "export"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

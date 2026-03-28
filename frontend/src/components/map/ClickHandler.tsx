@@ -11,7 +11,14 @@ interface ClickHandlerProps {
 }
 
 /** Handles click-to-add behaviour based on the current active tool mode. */
-export function ClickHandler({ placeMode, onPlacePoint, rulerMode, onRulerClick, radiusMode, onRadiusClick }: ClickHandlerProps): null {
+export function ClickHandler({
+  placeMode,
+  onPlacePoint,
+  rulerMode,
+  onRulerClick,
+  radiusMode,
+  onRadiusClick,
+}: ClickHandlerProps): null {
   useMapEvents({
     click(e) {
       if (rulerMode) {

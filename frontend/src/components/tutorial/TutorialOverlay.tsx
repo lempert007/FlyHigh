@@ -17,7 +17,14 @@ interface Props {
   onStop: () => void;
 }
 
-interface Rect { top: number; left: number; width: number; height: number; right: number; bottom: number }
+interface Rect {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  right: number;
+  bottom: number;
+}
 
 function computeCardPosition(rect: Rect | null): { top: number; left: number } {
   if (!rect) {
@@ -55,13 +62,24 @@ function computeCardPosition(rect: Rect | null): { top: number; left: number } {
   };
 }
 
-export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTab, onNext, onBack, onStop }: Props) {
+export function TutorialOverlay({
+  step,
+  stepIndex,
+  total,
+  activeTab,
+  setActiveTab,
+  onNext,
+  onBack,
+  onStop,
+}: Props) {
   const [rect, setRect] = useState<Rect | null>(null);
   const rafRef = useRef<number | null>(null);
 
   // Esc to stop
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onStop(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onStop();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onStop]);
@@ -71,14 +89,27 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
 
     function measure() {
-      if (!step.target) { setRect(null); return; }
+      if (!step.target) {
+        setRect(null);
+        return;
+      }
       const el = document.querySelector(`[data-tutorial="${step.target}"]`);
-      if (!el) { setRect(null); return; }
+      if (!el) {
+        setRect(null);
+        return;
+      }
       el.scrollIntoView({ block: "nearest", behavior: "smooth" });
       // Wait one more frame after scroll to get stable rect
       rafRef.current = requestAnimationFrame(() => {
         const r = el.getBoundingClientRect();
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height, right: r.right, bottom: r.bottom });
+        setRect({
+          top: r.top,
+          left: r.left,
+          width: r.width,
+          height: r.height,
+          right: r.right,
+          bottom: r.bottom,
+        });
       });
     }
 
@@ -92,8 +123,10 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
       rafRef.current = requestAnimationFrame(measure);
     }
 
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stepIndex]);
 
   const cardPos = computeCardPosition(rect);
@@ -104,7 +137,14 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
     <Portal>
       {/* SVG backdrop with mask hole over target */}
       <svg
-        style={{ position: "fixed", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 9998 }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          pointerEvents: "none",
+          zIndex: 9998,
+        }}
       >
         <defs>
           <mask id="tut-mask">
@@ -161,12 +201,22 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
           <Chip
             label={`Step ${stepIndex + 1} of ${total}`}
             size="small"
-            sx={{ bgcolor: "rgba(30,144,255,0.12)", color: "#1E90FF", fontWeight: 600, fontSize: "0.7rem" }}
+            sx={{
+              bgcolor: "rgba(30,144,255,0.12)",
+              color: "#1E90FF",
+              fontWeight: 600,
+              fontSize: "0.7rem",
+            }}
           />
           <Button
             size="small"
             onClick={onStop}
-            sx={{ minWidth: 0, p: 0.5, color: "text.disabled", "&:hover": { color: "text.primary" } }}
+            sx={{
+              minWidth: 0,
+              p: 0.5,
+              color: "text.disabled",
+              "&:hover": { color: "text.primary" },
+            }}
           >
             <CloseIcon fontSize="small" />
           </Button>
@@ -181,7 +231,12 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">
           {!isFirst && (
-            <Button size="small" onClick={onBack} variant="outlined" sx={{ textTransform: "none", minWidth: 72 }}>
+            <Button
+              size="small"
+              onClick={onBack}
+              variant="outlined"
+              sx={{ textTransform: "none", minWidth: 72 }}
+            >
               ← Back
             </Button>
           )}
@@ -189,7 +244,12 @@ export function TutorialOverlay({ step, stepIndex, total, activeTab, setActiveTa
             size="small"
             onClick={onNext}
             variant="contained"
-            sx={{ textTransform: "none", minWidth: 80, bgcolor: "#1E90FF", "&:hover": { bgcolor: "#1a7fe0" } }}
+            sx={{
+              textTransform: "none",
+              minWidth: 80,
+              bgcolor: "#1E90FF",
+              "&:hover": { bgcolor: "#1a7fe0" },
+            }}
           >
             {isLast ? "Finish ✓" : "Next →"}
           </Button>

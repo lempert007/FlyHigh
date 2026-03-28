@@ -34,10 +34,16 @@ async def apply_altitude_edit(
     if data is None:
         raise HTTPException(404, "No plan found for this session. Plan a route first.")
     if not data.waypoints_list:
-        raise HTTPException(409, "Waypoint data not available — re-plan to enable altitude editing.")
+        raise HTTPException(
+            409, "Waypoint data not available — re-plan to enable altitude editing."
+        )
 
     min_agl_m = data.meta.min_agl_m if data.meta.min_agl_m is not None else 0.0
-    valid_mask = ~data.no_terrain_mask if data.no_terrain_mask is not None else np.ones(len(data.waypoints_list), dtype=bool)
+    valid_mask = (
+        ~data.no_terrain_mask
+        if data.no_terrain_mask is not None
+        else np.ones(len(data.waypoints_list), dtype=bool)
+    )
     new_alts = np.array(body.alt_overrides, dtype=float)
     new_agl = new_alts - data.terrain_elevs
     valid_agl = new_agl[valid_mask]
@@ -57,19 +63,26 @@ async def apply_altitude_edit(
         raise HTTPException(422, str(exc))
 
     # Patch extra clearance stats that only the session version knows about (valid_mask)
-    updated_meta = updated_meta.model_copy(update={
-        "min_clearance_m":  round(float(np.min(valid_agl)),  1) if len(valid_agl) > 0 else None,
-        "mean_clearance_m": round(float(np.mean(valid_agl)), 1) if len(valid_agl) > 0 else None,
-    })
+    updated_meta = updated_meta.model_copy(
+        update={
+            "min_clearance_m": round(float(np.min(valid_agl)), 1) if len(valid_agl) > 0 else None,
+            "mean_clearance_m": round(float(np.mean(valid_agl)), 1) if len(valid_agl) > 0 else None,
+        }
+    )
 
-    session_store.store_plan_data(session_id, dataclasses.replace(
-        data,
-        final_alts=new_alts,
-        agl_arr=new_agl,
-        meta=updated_meta,
-        waypoints_list=[{**wp, "alt_m": round(float(a), 2)} for wp, a in zip(data.waypoints_list, new_alts)],
-        zip_bytes=new_zip_bytes,
-    ))
+    session_store.store_plan_data(
+        session_id,
+        dataclasses.replace(
+            data,
+            final_alts=new_alts,
+            agl_arr=new_agl,
+            meta=updated_meta,
+            waypoints_list=[
+                {**wp, "alt_m": round(float(a), 2)} for wp, a in zip(data.waypoints_list, new_alts)
+            ],
+            zip_bytes=new_zip_bytes,
+        ),
+    )
 
     user_zip_bytes = strip_internal_files(new_zip_bytes)
     filename = f"flyhigh_edited_{data.route_hash[:8]}.zip"
@@ -82,13 +95,19 @@ async def apply_altitude_edit(
 
 def _build_minimal_zip(data) -> bytes:
     """Fallback: build a minimal ZIP for sessions created before zip_bytes was stored."""
-    import io, json, zipfile
+    import io
+    import json
+    import zipfile
+
     from export.render_kml import render_kml
     from export.waypoints import serialise_waypoints_json
+
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("waypoints.json", serialise_waypoints_json(data.waypoints_list).encode())
-        zf.writestr("waypoints.kml",  render_kml(data.waypoints_list).encode())
-        zf.writestr("agl_profile.json", json.dumps([round(float(v), 2) for v in data.agl_arr]).encode())
+        zf.writestr("waypoints.kml", render_kml(data.waypoints_list).encode())
+        zf.writestr(
+            "agl_profile.json", json.dumps([round(float(v), 2) for v in data.agl_arr]).encode()
+        )
         zf.writestr("meta.json", data.meta.model_dump_json().encode())
     return buf.getvalue()

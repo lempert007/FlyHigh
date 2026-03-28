@@ -28,9 +28,9 @@ export interface PlanResultsState {
 }
 
 export function usePlanResults(): PlanResultsState {
-  const [planMeta, setPlanMeta]               = useState<PlanMeta | null>(null);
-  const [zipBlob, setZipBlob]                 = useState<Blob | null>(null);
-  const [routePoints, setRoutePoints]         = useState<LatLon[]>([]);
+  const [planMeta, setPlanMeta] = useState<PlanMeta | null>(null);
+  const [zipBlob, setZipBlob] = useState<Blob | null>(null);
+  const [routePoints, setRoutePoints] = useState<LatLon[]>([]);
   const [routeAglProfile, setRouteAglProfile] = useState<number[] | null>(null);
 
   const clearPlan = useCallback(() => {
@@ -40,11 +40,7 @@ export function usePlanResults(): PlanResultsState {
     setRouteAglProfile(null);
   }, []);
 
-  const restorePlan = useCallback((
-    folder: string,
-    savedMeta: PlanMeta,
-    onZipFail?: () => void,
-  ) => {
+  const restorePlan = useCallback((folder: string, savedMeta: PlanMeta, onZipFail?: () => void) => {
     setPlanMeta(savedMeta);
     fetchMissionPlan(folder)
       .then(({ blob, routePoints: rpts, aglProfile }) => {

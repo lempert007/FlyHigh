@@ -10,4 +10,3 @@ export const appTheme = createTheme({
   typography: { fontFamily: "Inter, system-ui, sans-serif" },
   shape: { borderRadius: 8 },
 });
-

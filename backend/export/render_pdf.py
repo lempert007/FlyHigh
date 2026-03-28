@@ -16,14 +16,13 @@ from pathlib import Path
 import numpy as np
 from fpdf import FPDF
 
-from session import LastPlanData
 from export.render_pdf_charts import (
-    route_overview_png,
     agl_heatmap_png,
-    terrain_map_png,
     altitude_profile_png,
+    route_overview_png,
+    terrain_map_png,
 )
-
+from session import LastPlanData
 
 # ── Fonts ─────────────────────────────────────────────────────────────────────
 
@@ -32,39 +31,40 @@ _FONTS_DIR = Path(__file__).parent / "fonts"
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 
-_PRIMARY      = (30, 144, 255)   # #1E90FF dodger blue (app primary)
-_PRIMARY_DARK = (18,  90, 170)
-_WHITE        = (255, 255, 255)
-_BG_PAGE      = (255, 255, 255)
-_BG_SURFACE   = (245, 247, 250)  # card fills / zebra stripes
-_TEXT         = ( 13,  17,  23)  # #0d1117
-_TEXT_MUTED   = (110, 118, 129)  # #6e7681
-_BORDER       = (208, 215, 222)
-_COVER_BG     = ( 13,  17,  23)  # near-black hero zone
+_PRIMARY = (30, 144, 255)  # #1E90FF dodger blue (app primary)
+_PRIMARY_DARK = (18, 90, 170)
+_WHITE = (255, 255, 255)
+_BG_PAGE = (255, 255, 255)
+_BG_SURFACE = (245, 247, 250)  # card fills / zebra stripes
+_TEXT = (13, 17, 23)  # #0d1117
+_TEXT_MUTED = (110, 118, 129)  # #6e7681
+_BORDER = (208, 215, 222)
+_COVER_BG = (13, 17, 23)  # near-black hero zone
 
-_SUCCESS      = (  0, 200,  83)
-_WARNING      = (255, 145,   0)
-_DANGER       = (255,  82,  82)
-_SUCCESS_BG   = (230, 255, 240)
-_WARNING_BG   = (255, 248, 230)
-_DANGER_BG    = (255, 235, 235)
-_SUCCESS_TEXT = ( 27,  94,  32)
-_WARNING_TEXT = (180,  72,   0)
-_DANGER_TEXT  = (183,  28,  28)
+_SUCCESS = (0, 200, 83)
+_WARNING = (255, 145, 0)
+_DANGER = (255, 82, 82)
+_SUCCESS_BG = (230, 255, 240)
+_WARNING_BG = (255, 248, 230)
+_DANGER_BG = (255, 235, 235)
+_SUCCESS_TEXT = (27, 94, 32)
+_WARNING_TEXT = (180, 72, 0)
+_DANGER_TEXT = (183, 28, 28)
 
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 
-_MARGIN    = 20       # mm
-_PAGE_W    = 210      # A4
-_PAGE_H    = 297
-_CONTENT_W = _PAGE_W - 2 * _MARGIN   # 170 mm
-_ROW_H     = 6.5
-_CARD_R    = 1.5      # corner radius
-_NB_ALIAS  = "{nb}"  # total pages alias
+_MARGIN = 20  # mm
+_PAGE_W = 210  # A4
+_PAGE_H = 297
+_CONTENT_W = _PAGE_W - 2 * _MARGIN  # 170 mm
+_ROW_H = 6.5
+_CARD_R = 1.5  # corner radius
+_NB_ALIAS = "{nb}"  # total pages alias
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _fmt_dist(m: float) -> str:
     return f"{m / 1000:.2f} km" if m >= 1000 else f"{m:.0f} m"
@@ -108,16 +108,17 @@ def _battery_color(pct: float) -> tuple:
 
 
 _KIND_LABEL: dict[str, str] = {
-    "terrain_band":    "Terrain band too narrow",
-    "slope":           "Slope limit exceeded",
-    "vertical":        "Below surface model",
-    "horizontal":      "Safety bubble obstacle",
+    "terrain_band": "Terrain band too narrow",
+    "slope": "Slope limit exceeded",
+    "vertical": "Below surface model",
+    "horizontal": "Safety bubble obstacle",
     "surface_warning": "Above max AGL",
-    "camera_range":    "Camera range exceeded",
+    "camera_range": "Camera range exceeded",
 }
 
 
 # ── PDF class ─────────────────────────────────────────────────────────────────
+
 
 class MissionPDF(FPDF):
     """FPDF subclass with FlyHigh-specific drawing helpers."""
@@ -127,9 +128,9 @@ class MissionPDF(FPDF):
 
         # Load Inter font (full Unicode support)
         regular = _FONTS_DIR / "Inter-Regular.ttf"
-        bold    = _FONTS_DIR / "Inter-Bold.ttf"
+        bold = _FONTS_DIR / "Inter-Bold.ttf"
         if regular.exists() and bold.exists():
-            self.add_font("Inter",      fname=str(regular))
+            self.add_font("Inter", fname=str(regular))
             self.add_font("Inter", "B", fname=str(bold))
             self._font_family = "Inter"
         else:
@@ -155,7 +156,9 @@ class MissionPDF(FPDF):
         self.ln(2)
         self._f("", 7)
         self.set_text_color(*_TEXT_MUTED)
-        label = f"{self.mission_name}  \u00b7  FlyHigh  \u00b7  Page {self.page_no()} of {_NB_ALIAS}"
+        label = (
+            f"{self.mission_name}  \u00b7  FlyHigh  \u00b7  Page {self.page_no()} of {_NB_ALIAS}"
+        )
         self.cell(0, 5, label, align="C")
 
     def header_bar(self, subtitle: str) -> None:
@@ -222,16 +225,16 @@ class MissionPDF(FPDF):
 
     def kpi_grid(self, kpis: list[tuple[str, str, tuple]], cols: int = 3) -> None:
         """Row(s) of tall KPI cards with colored top accent bar."""
-        gap     = 3.0
-        card_w  = (_CONTENT_W - gap * (cols - 1)) / cols
-        card_h  = 26.0
-        y0      = self.get_y()
+        gap = 3.0
+        card_w = (_CONTENT_W - gap * (cols - 1)) / cols
+        card_h = 26.0
+        y0 = self.get_y()
 
         for i, (label, value, color) in enumerate(kpis):
             col = i % cols
             row = i // cols
-            x   = _MARGIN + col * (card_w + gap)
-            y   = y0 + row * (card_h + gap)
+            x = _MARGIN + col * (card_w + gap)
+            y = y0 + row * (card_h + gap)
 
             # Card background
             self.set_fill_color(*_BG_SURFACE)
@@ -284,7 +287,7 @@ class MissionPDF(FPDF):
 
     def violation_table(self, violations: list) -> None:
         """Color-coded table of violations, with manual page-break protection."""
-        col_w   = [8, 48, 82, 32]
+        col_w = [8, 48, 82, 32]
         headers = ["#", "Type", "Description", "Location"]
 
         def _header() -> None:
@@ -310,7 +313,7 @@ class MissionPDF(FPDF):
 
             y = self.get_y()
             is_safety = getattr(v, "category", "safety") == "safety"
-            bg   = _DANGER_BG   if is_safety else _WARNING_BG
+            bg = _DANGER_BG if is_safety else _WARNING_BG
             tcol = _DANGER_TEXT if is_safety else _WARNING_TEXT
 
             self.set_fill_color(*bg)
@@ -325,7 +328,7 @@ class MissionPDF(FPDF):
             if desc != v.description:
                 desc = desc.rstrip()[:-1] + "\u2026"
 
-            loc   = f"{v.lat:.5f}, {v.lon:.5f}" if (v.lat is not None and v.lon is not None) else "-"
+            loc = f"{v.lat:.5f}, {v.lon:.5f}" if (v.lat is not None and v.lon is not None) else "-"
             cells = [str(i + 1), _KIND_LABEL.get(v.kind, v.kind), desc, loc]
             self.set_text_color(*tcol)
             self._f("B" if is_safety else "", 7)
@@ -341,10 +344,10 @@ class MissionPDF(FPDF):
 
     def stat_chips(self, chips: list[tuple[str, str]]) -> None:
         """Small bordered chips for secondary stats."""
-        x     = float(_MARGIN)
-        y     = self.get_y()
-        ch_h  = 7.0
-        gap   = 2.5
+        x = float(_MARGIN)
+        y = self.get_y()
+        ch_h = 7.0
+        gap = 2.5
 
         for label, value in chips:
             text = f"{value}  {label}"
@@ -352,7 +355,7 @@ class MissionPDF(FPDF):
             w = self.get_string_width(text) + 8
 
             if x + w > _MARGIN + _CONTENT_W:
-                x  = float(_MARGIN)
+                x = float(_MARGIN)
                 y += ch_h + gap
 
             self.set_fill_color(*_BG_SURFACE)
@@ -377,9 +380,9 @@ class MissionPDF(FPDF):
 
     def integrity_block(self, lines: list[str]) -> None:
         """Monospaced green-tinted block for route integrity info."""
-        row_h   = _ROW_H
+        row_h = _ROW_H
         block_h = len(lines) * row_h + 8
-        y0      = self.get_y()
+        y0 = self.get_y()
 
         self.set_fill_color(230, 245, 233)
         self.set_draw_color(165, 214, 167)
@@ -411,14 +414,19 @@ class MissionPDF(FPDF):
             self.set_text_color(*_TEXT)
         self.ln(2)
 
-    def two_col_images(self, left_b64: str, right_b64: str | None,
-                       left_cap: str = "", right_cap: str = "",
-                       height: float = 90) -> None:
+    def two_col_images(
+        self,
+        left_b64: str,
+        right_b64: str | None,
+        left_cap: str = "",
+        right_cap: str = "",
+        height: float = 90,
+    ) -> None:
         """Two images side by side with captions."""
         col_w = (_CONTENT_W - 4) / 2
-        y     = self.get_y()
+        y = self.get_y()
 
-        self.image(_b64_image(left_b64),  x=_MARGIN,              y=y, w=col_w, h=height)
+        self.image(_b64_image(left_b64), x=_MARGIN, y=y, w=col_w, h=height)
         if right_b64:
             self.image(_b64_image(right_b64), x=_MARGIN + col_w + 4, y=y, w=col_w, h=height)
 
@@ -439,8 +447,8 @@ class MissionPDF(FPDF):
 # ── Page body builders ────────────────────────────────────────────────────────
 # Each builder receives a pdf with a page already added by the caller.
 
-def _cover_page_body(pdf: MissionPDF, data: LastPlanData,
-                     operator: str, organization: str) -> None:
+
+def _cover_page_body(pdf: MissionPDF, data: LastPlanData, operator: str, organization: str) -> None:
     """Hero-style cover: dark zone (top 100 mm) + white meta zone."""
     # Dark hero zone
     pdf.set_fill_color(*_COVER_BG)
@@ -483,11 +491,11 @@ def _cover_page_body(pdf: MissionPDF, data: LastPlanData,
     y_meta = 110
 
     # 3-column meta row
-    col_w   = _CONTENT_W / 3
-    gen_dt  = data.generated_at.replace("T", " ")[:16] + " UTC"
-    op_val  = operator or "\u2014"
+    col_w = _CONTENT_W / 3
+    gen_dt = data.generated_at.replace("T", " ")[:16] + " UTC"
+    op_val = operator or "\u2014"
     org_val = organization or "\u2014"
-    metas   = [("DATE", gen_dt), ("OPERATOR", op_val), ("ORGANIZATION", org_val)]
+    metas = [("DATE", gen_dt), ("OPERATOR", op_val), ("ORGANIZATION", org_val)]
 
     for i, (lbl, val) in enumerate(metas):
         x = _MARGIN + i * col_w
@@ -597,27 +605,39 @@ def _summary_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
     m = data.meta
 
     pdf.section_title("Key Performance Indicators")
-    pdf.kpi_grid([
-        ("Total distance", _fmt_dist(m.total_distance_m),                                              _PRIMARY),
-        ("Flight time",    _fmt_time(m.flight_time_s),                                                 (0, 168, 150)),
-        ("Battery usage",  f"{m.budget_pct:.1f}%",                                                     _battery_color(m.budget_pct)),
-        ("Min clearance",  f"{m.min_clearance_m:.0f} m" if m.min_clearance_m is not None else "\u2014",_clearance_color(m.min_clearance_m)),
-        ("Mean clearance", f"{m.mean_clearance_m:.0f} m" if m.mean_clearance_m is not None else "\u2014",(85, 139, 47)),
-        ("Coverage area",  _fmt_area(m.covered_area_m2),                                               (120, 80, 200)),
-    ])
+    pdf.kpi_grid(
+        [
+            ("Total distance", _fmt_dist(m.total_distance_m), _PRIMARY),
+            ("Flight time", _fmt_time(m.flight_time_s), (0, 168, 150)),
+            ("Battery usage", f"{m.budget_pct:.1f}%", _battery_color(m.budget_pct)),
+            (
+                "Min clearance",
+                f"{m.min_clearance_m:.0f} m" if m.min_clearance_m is not None else "\u2014",
+                _clearance_color(m.min_clearance_m),
+            ),
+            (
+                "Mean clearance",
+                f"{m.mean_clearance_m:.0f} m" if m.mean_clearance_m is not None else "\u2014",
+                (85, 139, 47),
+            ),
+            ("Coverage area", _fmt_area(m.covered_area_m2), (120, 80, 200)),
+        ]
+    )
 
     terrain_res = f"{m.terrain_resolution_m:.1f} m/px" if m.terrain_resolution_m else "\u2014"
-    pdf.stat_chips([
-        ("Waypoints",    str(len(data.waypoint_indices))),
-        ("POIs",         str(len(data.poi_indices))),
-        ("Terrain res.", terrain_res),
-        ("Violations",   str(len(m.violations or []))),
-        ("Tight segs",   str(m.tight_segment_count or 0)),
-        ("Energy",       f"{m.energy_wh:.1f} Wh"),
-    ])
+    pdf.stat_chips(
+        [
+            ("Waypoints", str(len(data.waypoint_indices))),
+            ("POIs", str(len(data.poi_indices))),
+            ("Terrain res.", terrain_res),
+            ("Violations", str(len(m.violations or []))),
+            ("Tight segs", str(m.tight_segment_count or 0)),
+            ("Energy", f"{m.energy_wh:.1f} Wh"),
+        ]
+    )
 
     if m.violations:
-        safety_v      = [v for v in m.violations if getattr(v, "category", "safety") == "safety"]
+        safety_v = [v for v in m.violations if getattr(v, "category", "safety") == "safety"]
         product_poi_v = [v for v in m.violations if getattr(v, "category", "") == "product_poi"]
         product_rte_v = [v for v in m.violations if getattr(v, "category", "") == "product_route"]
 
@@ -632,8 +652,9 @@ def _summary_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
             pdf.violation_table(product_rte_v)
 
 
-def _safety_page_body(pdf: MissionPDF, data: LastPlanData,
-                      agl_img: str, terrain_img: str | None) -> None:
+def _safety_page_body(
+    pdf: MissionPDF, data: LastPlanData, agl_img: str, terrain_img: str | None
+) -> None:
     """AGL heatmap and terrain map side by side."""
     pdf.header_bar("SAFETY ANALYSIS")
     pdf.section_title("AGL Clearance & Terrain")
@@ -641,7 +662,8 @@ def _safety_page_body(pdf: MissionPDF, data: LastPlanData,
     pdf._f("", 8)
     pdf.set_text_color(*_TEXT_MUTED)
     pdf.cell(
-        _CONTENT_W, 5,
+        _CONTENT_W,
+        5,
         "Thresholds:  Green (>15 m) comfortable   Amber (5\u201315 m) tight   Red (<5 m) critical",
         ln=1,
     )
@@ -650,7 +672,8 @@ def _safety_page_body(pdf: MissionPDF, data: LastPlanData,
 
     if terrain_img:
         pdf.two_col_images(
-            agl_img, terrain_img,
+            agl_img,
+            terrain_img,
             left_cap="AGL clearance heat map",
             right_cap="Terrain elevation beneath route (m MSL)",
             height=90,
@@ -676,14 +699,16 @@ def _profile_page_body(pdf: MissionPDF, data: LastPlanData, profile_img: str) ->
     valid_agl = data.agl_arr[np.isfinite(data.agl_arr)]
     alts = data.final_alts
     pdf.section_title("Altitude Statistics")
-    pdf.data_table([
-        ("Max altitude (MSL)",  f"{alts.max():.1f} m"),
-        ("Min altitude (MSL)",  f"{alts.min():.1f} m"),
-        ("Mean altitude (MSL)", f"{alts.mean():.1f} m"),
-        ("Max AGL clearance",   f"{valid_agl.max():.1f} m" if valid_agl.size else "\u2014"),
-        ("Min AGL clearance",   f"{valid_agl.min():.1f} m" if valid_agl.size else "\u2014"),
-        ("Mean AGL clearance",  f"{valid_agl.mean():.1f} m" if valid_agl.size else "\u2014"),
-    ])
+    pdf.data_table(
+        [
+            ("Max altitude (MSL)", f"{alts.max():.1f} m"),
+            ("Min altitude (MSL)", f"{alts.min():.1f} m"),
+            ("Mean altitude (MSL)", f"{alts.mean():.1f} m"),
+            ("Max AGL clearance", f"{valid_agl.max():.1f} m" if valid_agl.size else "\u2014"),
+            ("Min AGL clearance", f"{valid_agl.min():.1f} m" if valid_agl.size else "\u2014"),
+            ("Mean AGL clearance", f"{valid_agl.mean():.1f} m" if valid_agl.size else "\u2014"),
+        ]
+    )
 
 
 def _poi_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
@@ -695,24 +720,27 @@ def _poi_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
     pdf.section_title("POI Maneuver Plans")
 
     for j, poi in enumerate(data.pois):
-        m             = poi.maneuver
-        name          = poi.name or f"POI {j + 1}"
-        agl_min       = m.poi_min_agl_m if m.poi_min_agl_m is not None else data.fc.min_agl_m
-        agl_max       = m.poi_max_agl_m if m.poi_max_agl_m is not None else data.fc.max_agl_m
-        poi_dist      = data.poi_distances[j] if j < len(data.poi_distances) else None
+        m = poi.maneuver
+        name = poi.name or f"POI {j + 1}"
+        agl_min = m.poi_min_agl_m if m.poi_min_agl_m is not None else data.fc.min_agl_m
+        agl_max = m.poi_max_agl_m if m.poi_max_agl_m is not None else data.fc.max_agl_m
+        poi_dist = data.poi_distances[j] if j < len(data.poi_distances) else None
         maneuver_label = "Lawnmower" if m.type == "lawnmower" else "Warp & Weft"
-        poly_note     = " (custom polygon)" if m.polygon else ""
+        poly_note = " (custom polygon)" if m.polygon else ""
 
         rows = [
-            ("Coordinates",       f"{poi.point.lat:.6f}, {poi.point.lon:.6f}"),
-            ("Maneuver type",     f"{maneuver_label}{poly_note}"),
-            ("Coverage area",     f"{m.width_m:.0f} m \u00d7 {m.height_m:.0f} m = {_fmt_area(m.width_m * m.height_m)}"),
-            ("Sweep spacing",     f"{m.sweep_spacing_m:.1f} m"),
-            ("AGL band",          f"{agl_min:.0f} \u2013 {agl_max:.0f} m"),
+            ("Coordinates", f"{poi.point.lat:.6f}, {poi.point.lon:.6f}"),
+            ("Maneuver type", f"{maneuver_label}{poly_note}"),
+            (
+                "Coverage area",
+                f"{m.width_m:.0f} m \u00d7 {m.height_m:.0f} m = {_fmt_area(m.width_m * m.height_m)}",
+            ),
+            ("Sweep spacing", f"{m.sweep_spacing_m:.1f} m"),
+            ("AGL band", f"{agl_min:.0f} \u2013 {agl_max:.0f} m"),
             ("Distance on route", _fmt_dist(poi_dist) if poi_dist is not None else "\u2014"),
         ]
         card_h = len(rows) * _ROW_H + 22
-        y0     = pdf.get_y()
+        y0 = pdf.get_y()
         if y0 + card_h > _PAGE_H - 28:
             pdf.add_page()
             pdf.header_bar("POINT-OF-INTEREST DETAILS (cont.)")
@@ -782,25 +810,26 @@ def _poi_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
     pdf.set_text_color(*_TEXT)
 
 
-def _config_page_body(pdf: MissionPDF, data: LastPlanData,
-                      operator: str, organization: str) -> None:
+def _config_page_body(
+    pdf: MissionPDF, data: LastPlanData, operator: str, organization: str
+) -> None:
     """Flight parameters, integrity hash, status."""
     pdf.header_bar("CONFIGURATION & INTEGRITY")
     fc = data.fc
 
     cfg_fields = [
-        ("Min AGL",             f"{fc.min_agl_m} m"),
-        ("Max AGL",             f"{fc.max_agl_m} m"),
-        ("Safety radius",       f"{fc.point_radius_m} m"),
+        ("Min AGL", f"{fc.min_agl_m} m"),
+        ("Max AGL", f"{fc.max_agl_m} m"),
+        ("Safety radius", f"{fc.point_radius_m} m"),
         ("Camera range radius", f"{fc.max_surface_radius_m} m"),
-        ("Cruise speed",        f"{fc.cruise_speed_ms} m/s"),
-        ("Climb rate",          f"{fc.climb_rate_ms} m/s"),
-        ("Route spacing",       f"{fc.spacing_m} m"),
-        ("Battery capacity",    f"{fc.battery_wh} Wh"),
-        ("Drone weight",        f"{fc.drone_weight_kg} kg"),
-        ("Optimize POI order",  "Yes" if fc.optimize_poi_order else "No"),
-        ("Smart Route",         "Yes" if fc.smart_route else "No"),
-        ("Min altitude step",   f"{fc.min_altitude_step_m} m"),
+        ("Cruise speed", f"{fc.cruise_speed_ms} m/s"),
+        ("Climb rate", f"{fc.climb_rate_ms} m/s"),
+        ("Route spacing", f"{fc.spacing_m} m"),
+        ("Battery capacity", f"{fc.battery_wh} Wh"),
+        ("Drone weight", f"{fc.drone_weight_kg} kg"),
+        ("Optimize POI order", "Yes" if fc.optimize_poi_order else "No"),
+        ("Smart Route", "Yes" if fc.smart_route else "No"),
+        ("Min altitude step", f"{fc.min_altitude_step_m} m"),
     ]
     if fc.max_slope_ratio is not None:
         cfg_fields.append(("Max slope ratio", f"1:{1 / fc.max_slope_ratio:.0f}"))
@@ -811,14 +840,16 @@ def _config_page_body(pdf: MissionPDF, data: LastPlanData,
     _draw_two_col_table(pdf, cfg_fields)
 
     gen_utc = data.generated_at.replace("T", " ") + " UTC"
-    op_str  = (operator or "\u2014") + (f" / {organization}" if organization else "")
+    op_str = (operator or "\u2014") + (f" / {organization}" if organization else "")
     pdf.section_title("Route Integrity")
-    pdf.integrity_block([
-        f"SHA-256 Route ID: {data.route_hash}",
-        f"Generated:        {gen_utc}",
-        f"Mission:          {data.mission_name or 'Untitled'}",
-        f"Operator:         {op_str}",
-    ])
+    pdf.integrity_block(
+        [
+            f"SHA-256 Route ID: {data.route_hash}",
+            f"Generated:        {gen_utc}",
+            f"Mission:          {data.mission_name or 'Untitled'}",
+            f"Operator:         {op_str}",
+        ]
+    )
 
     pdf.section_title("Mission Status")
     pdf.status_stamp(data)
@@ -826,10 +857,10 @@ def _config_page_body(pdf: MissionPDF, data: LastPlanData,
 
 def _draw_two_col_table(pdf: MissionPDF, rows: list[tuple[str, str]]) -> None:
     """Render key/value rows in two side-by-side columns."""
-    half    = math.ceil(len(rows) / 2)
-    left    = rows[:half]
-    right   = rows[half:]
-    col_w   = (_CONTENT_W - 4) / 2
+    half = math.ceil(len(rows) / 2)
+    left = rows[:half]
+    right = rows[half:]
+    col_w = (_CONTENT_W - 4) / 2
     label_w = col_w * 0.55
 
     def draw_col(items: list[tuple[str, str]], x_off: float) -> float:
@@ -847,7 +878,7 @@ def _draw_two_col_table(pdf: MissionPDF, rows: list[tuple[str, str]]) -> None:
             pdf.cell(col_w - label_w - 4, _ROW_H, val, ln=1)
         return pdf.get_y()
 
-    y_start    = pdf.get_y()
+    y_start = pdf.get_y()
     y_left_end = draw_col(left, 0)
     pdf.set_y(y_start)
     y_right_end = draw_col(right, col_w + 4)
@@ -856,6 +887,7 @@ def _draw_two_col_table(pdf: MissionPDF, rows: list[tuple[str, str]]) -> None:
 
 
 # ── Two-pass generator ────────────────────────────────────────────────────────
+
 
 def _build_pdf(
     data: LastPlanData,
@@ -873,7 +905,7 @@ def _build_pdf(
     page_map records the page each named section starts on (only populated
     when include_toc=False).
     """
-    pdf       = MissionPDF()
+    pdf = MissionPDF()
     pdf.mission_name = data.mission_name or "FlyHigh Mission"
     page_map: dict[str, int] = {}
 
@@ -921,6 +953,7 @@ def _build_pdf(
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+
 def generate_pdf(data: LastPlanData, operator_name: str, organization: str) -> bytes:
     """Generate the full mission report PDF and return as bytes."""
     landing_dist: float | None = None
@@ -929,28 +962,44 @@ def generate_pdf(data: LastPlanData, operator_name: str, organization: str) -> b
 
     # Generate all charts once (base64 strings)
     route_img = route_overview_png(
-        data.lats, data.lons, data.agl_arr, data.fc.min_agl_m,
-        data.poi_indices, data.waypoint_indices,
-        data.start_index, data.landing_index, data.fc.point_radius_m,
+        data.lats,
+        data.lons,
+        data.agl_arr,
+        data.fc.min_agl_m,
+        data.poi_indices,
+        data.waypoint_indices,
+        data.start_index,
+        data.landing_index,
+        data.fc.point_radius_m,
     )
     agl_img = agl_heatmap_png(data.lats, data.lons, data.agl_arr, data.fc.min_agl_m)
     profile_img = altitude_profile_png(
-        data.cum_dists, data.final_alts, data.terrain_elevs,
-        data.fc.min_agl_m, data.fc.max_agl_m,
-        data.poi_distances, landing_dist,
+        data.cum_dists,
+        data.final_alts,
+        data.terrain_elevs,
+        data.fc.min_agl_m,
+        data.fc.max_agl_m,
+        data.poi_distances,
+        landing_dist,
     )
     terrain_img: str | None = None
-    if (data.terrain_grid is not None
-            and data.terrain_grid_lons is not None
-            and data.terrain_grid_lats is not None):
+    if (
+        data.terrain_grid is not None
+        and data.terrain_grid_lons is not None
+        and data.terrain_grid_lats is not None
+    ):
         terrain_img = terrain_map_png(
-            data.terrain_grid, data.terrain_grid_lons, data.terrain_grid_lats,
-            data.lats, data.lons, data.poi_indices,
-            data.start_index, data.landing_index,
+            data.terrain_grid,
+            data.terrain_grid_lons,
+            data.terrain_grid_lats,
+            data.lats,
+            data.lons,
+            data.poi_indices,
+            data.start_index,
+            data.landing_index,
         )
 
-    chart_args = (data, operator_name, organization,
-                  route_img, agl_img, profile_img, terrain_img)
+    chart_args = (data, operator_name, organization, route_img, agl_img, profile_img, terrain_img)
 
     # Pass 1: no TOC — capture section page numbers
     _, page_map = _build_pdf(*chart_args, include_toc=False, toc_map=None)

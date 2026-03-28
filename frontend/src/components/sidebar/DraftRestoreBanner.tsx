@@ -33,7 +33,14 @@ export function DraftRestoreBanner({ draftAge, onRestore, onDismiss }: DraftRest
             size="small"
             color="inherit"
             onClick={onDismiss}
-            sx={{ textTransform: "none", py: 0.25, px: 0.75, fontSize: "0.72rem", minWidth: 0, opacity: 0.7 }}
+            sx={{
+              textTransform: "none",
+              py: 0.25,
+              px: 0.75,
+              fontSize: "0.72rem",
+              minWidth: 0,
+              opacity: 0.7,
+            }}
           >
             Dismiss
           </Button>

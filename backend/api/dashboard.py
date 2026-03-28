@@ -11,7 +11,6 @@ import json
 import logging
 import math
 from collections import Counter
-from pathlib import Path
 
 from fastapi import APIRouter
 
@@ -64,6 +63,7 @@ def _poi_area_m2(maneuver: dict) -> float:
 
 # ── Stats computation ─────────────────────────────────────────────────────────
 
+
 def _read_all_missions() -> list[dict]:
     """Return the raw JSON dict for every readable mission.json in MISSIONS_ROOT."""
     results: list[dict] = []
@@ -113,8 +113,11 @@ def _compute_stats(missions: list[dict]) -> DashboardStats:
                 if polygon and len(polygon) >= 3:
                     lats = [p["lat"] for p in polygon]
                     lons = [p["lon"] for p in polygon]
-                    height_m = (_deg_to_m_lon(sum(lats) / len(lats))
-                                * (max(lons) - min(lons))) if len(lons) > 1 else float(maneuver.get("height_m", 100.0))
+                    height_m = (
+                        (_deg_to_m_lon(sum(lats) / len(lats)) * (max(lons) - min(lons)))
+                        if len(lons) > 1
+                        else float(maneuver.get("height_m", 100.0))
+                    )
                 else:
                     height_m = float(maneuver.get("height_m", 100.0))
                 n_strips = area / max(sweep_spacing * height_m, 1.0)
@@ -130,20 +133,26 @@ def _compute_stats(missions: list[dict]) -> DashboardStats:
             preset_counter[preset_name] += 1
 
         start = route.get("start")
-        pins.append(MissionPin(
-            folder=m.get("folder", ""),
-            name=m.get("name", ""),
-            status=MissionStatus(status) if status in ("draft", "ready", "flown") else MissionStatus.draft,
-            created_at=m.get("created_at", ""),
-            lat=float(start["lat"]) if start else None,
-            lon=float(start["lon"]) if start else None,
-        ))
+        pins.append(
+            MissionPin(
+                folder=m.get("folder", ""),
+                name=m.get("name", ""),
+                status=MissionStatus(status)
+                if status in ("draft", "ready", "flown")
+                else MissionStatus.draft,
+                created_at=m.get("created_at", ""),
+                lat=float(start["lat"]) if start else None,
+                lon=float(start["lon"]) if start else None,
+            )
+        )
 
     recent = [
         RecentMission(
             folder=m.get("folder", ""),
             name=m.get("name", ""),
-            status=MissionStatus(m.get("status", "draft")) if m.get("status") in ("draft", "ready", "flown") else MissionStatus.draft,
+            status=MissionStatus(m.get("status", "draft"))
+            if m.get("status") in ("draft", "ready", "flown")
+            else MissionStatus.draft,
             updated_at=m.get("updated_at", ""),
         )
         for m in all_sorted[:10]
@@ -163,6 +172,7 @@ def _compute_stats(missions: list[dict]) -> DashboardStats:
 
 
 # ── Endpoint ──────────────────────────────────────────────────────────────────
+
 
 @router.get("/stats", response_model=DashboardStats)
 def get_dashboard_stats() -> DashboardStats:

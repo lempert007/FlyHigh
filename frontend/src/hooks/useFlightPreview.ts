@@ -41,7 +41,8 @@ export function useFlightPreview(routePoints: LatLon[], cruiseSpeedMs: number): 
   const cumDistances = useMemo(() => {
     if (routePoints.length < 2) return [0];
     const d = [0];
-    for (let i = 1; i < routePoints.length; i++) d.push(d[i - 1] + haversineM(routePoints[i - 1], routePoints[i]));
+    for (let i = 1; i < routePoints.length; i++)
+      d.push(d[i - 1] + haversineM(routePoints[i - 1], routePoints[i]));
     return d;
   }, [routePoints]);
 
@@ -62,8 +63,12 @@ export function useFlightPreview(routePoints: LatLon[], cruiseSpeedMs: number): 
       const segDist = cumDistances[i] - cumDistances[i - 1];
       const t = segDist > 0 ? (targetDist - cumDistances[i - 1]) / segDist : 0;
       return {
-        position: { lat: prev.lat + (curr.lat - prev.lat) * t, lon: prev.lon + (curr.lon - prev.lon) * t },
-        bearing: ((Math.atan2(curr.lon - prev.lon, curr.lat - prev.lat) * 180) / Math.PI + 360) % 360,
+        position: {
+          lat: prev.lat + (curr.lat - prev.lat) * t,
+          lon: prev.lon + (curr.lon - prev.lon) * t,
+        },
+        bearing:
+          ((Math.atan2(curr.lon - prev.lon, curr.lat - prev.lat) * 180) / Math.PI + 360) % 360,
       };
     },
     [routePoints, cumDistances, totalDistM]
@@ -79,19 +84,28 @@ export function useFlightPreview(routePoints: LatLon[], cruiseSpeedMs: number): 
       lastTsRef.current = ts;
 
       const dur = totalDurationRef.current;
-      if (dur <= 0) { setIsPlaying(false); return; }
+      if (dur <= 0) {
+        setIsPlaying(false);
+        return;
+      }
 
       elapsedRef.current = Math.min(elapsedRef.current + dt * speedRef.current, dur);
       const p = elapsedRef.current / dur;
       setProgress(p);
 
-      if (p >= 1) { setIsPlaying(false); return; }
+      if (p >= 1) {
+        setIsPlaying(false);
+        return;
+      }
       rafRef.current = requestAnimationFrame(step);
     };
 
     rafRef.current = requestAnimationFrame(step);
     return () => {
-      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
       lastTsRef.current = null;
     };
   }, [isPlaying]);

@@ -67,9 +67,8 @@ export const waypointIcon = (n: number) => makeColorIcon("#2196f3", String(n));
 export const poiIcon = (n: number) => makeColorIcon("#FF7043", `P${n}`);
 
 export function makeViolationIcon(category: string): L.DivIcon {
-  const color = category === "safety" ? "#ff5252"
-    : category === "product_poi" ? "#ff9100"
-    : "#ffd600";
+  const color =
+    category === "safety" ? "#ff5252" : category === "product_poi" ? "#ff9100" : "#ffd600";
   return L.divIcon({
     className: "",
     html: `<div style="

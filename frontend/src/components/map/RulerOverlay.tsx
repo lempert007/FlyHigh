@@ -15,16 +15,23 @@ export function RulerOverlay({ points, cursor }: RulerOverlayProps): React.React
 
   const segments = [];
   for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i], b = points[i + 1];
+    const a = points[i],
+      b = points[i + 1];
     const mid: [number, number] = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
     segments.push({ a, b, mid, dist: haversineM(a, b) });
   }
 
-  let liveSeg: { a: [number, number]; b: [number, number]; mid: [number, number]; dist: number } | null = null;
+  let liveSeg: {
+    a: [number, number];
+    b: [number, number];
+    mid: [number, number];
+    dist: number;
+  } | null = null;
   if (cursor) {
     const a = points[points.length - 1];
     liveSeg = {
-      a, b: cursor,
+      a,
+      b: cursor,
       mid: [(a[0] + cursor[0]) / 2, (a[1] + cursor[1]) / 2],
       dist: haversineM(a, cursor),
     };
@@ -42,13 +49,27 @@ export function RulerOverlay({ points, cursor }: RulerOverlayProps): React.React
       {segments.map((s, i) => (
         <React.Fragment key={i}>
           <Polyline positions={[s.a, s.b]} color="#FF9800" weight={2} opacity={0.9} />
-          <Marker position={s.mid} icon={makeDistanceIcon(formatDist(s.dist))} interactive={false} />
+          <Marker
+            position={s.mid}
+            icon={makeDistanceIcon(formatDist(s.dist))}
+            interactive={false}
+          />
         </React.Fragment>
       ))}
       {liveSeg && (
         <>
-          <Polyline positions={[liveSeg.a, liveSeg.b]} color="#FF9800" weight={1.5} dashArray="6 5" opacity={0.8} />
-          <Marker position={liveSeg.mid} icon={makeDistanceIcon(formatDist(liveSeg.dist))} interactive={false} />
+          <Polyline
+            positions={[liveSeg.a, liveSeg.b]}
+            color="#FF9800"
+            weight={1.5}
+            dashArray="6 5"
+            opacity={0.8}
+          />
+          <Marker
+            position={liveSeg.mid}
+            icon={makeDistanceIcon(formatDist(liveSeg.dist))}
+            interactive={false}
+          />
         </>
       )}
       {points.map((p, i) => (
@@ -59,10 +80,18 @@ export function RulerOverlay({ points, cursor }: RulerOverlayProps): React.React
 }
 
 /** Tracks cursor position for ruler live preview — must be mounted inside MapContainer. */
-export function RulerCursorTracker({ onMove }: { onMove: (pt: [number, number] | null) => void }): null {
+export function RulerCursorTracker({
+  onMove,
+}: {
+  onMove: (pt: [number, number] | null) => void;
+}): null {
   useMapEvents({
-    mousemove(e) { onMove([e.latlng.lat, e.latlng.lng]); },
-    mouseout()   { onMove(null); },
+    mousemove(e) {
+      onMove([e.latlng.lat, e.latlng.lng]);
+    },
+    mouseout() {
+      onMove(null);
+    },
   });
   return null;
 }

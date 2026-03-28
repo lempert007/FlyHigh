@@ -1,8 +1,27 @@
 import JSZip from "jszip";
-import type { LatLon, Poi, FlightConfig, UploadResult, PlanMeta, AvailableTiff, TiffSelection, MissionSummary, MissionState, MissionStatus, PresetItem, DashboardStats, AppSettings } from "../types/mission";
+import type {
+  LatLon,
+  Poi,
+  FlightConfig,
+  UploadResult,
+  PlanMeta,
+  AvailableTiff,
+  TiffSelection,
+  MissionSummary,
+  MissionState,
+  MissionStatus,
+  PresetItem,
+  DashboardStats,
+  AppSettings,
+} from "../types/mission";
 
-interface PydanticError { loc?: string[]; msg: string }
-interface ErrorBody { detail?: string | PydanticError[] }
+interface PydanticError {
+  loc?: string[];
+  msg: string;
+}
+interface ErrorBody {
+  detail?: string | PydanticError[];
+}
 
 function parseErrorDetail(data: ErrorBody | null, fallback: string): string {
   if (!data) return fallback;
@@ -55,7 +74,7 @@ let _planAbortController: AbortController | null = null;
  * Automatically cancels any previous in-flight plan request. */
 export async function planRoute(
   sessionId: string,
-  routeRequest: Record<string, unknown>,
+  routeRequest: Record<string, unknown>
 ): Promise<{ blob: Blob; meta: PlanMeta | null }> {
   // Cancel previous request if still pending
   _planAbortController?.abort();
@@ -100,12 +119,25 @@ interface BuildRouteRequestOptions {
 
 /** Build a RouteRequest from app state. Landing is always start (return-to-home). */
 export function buildRouteRequest({
-  start, waypoints, pois, config,
-  name = "", notes = "", takeoff_alt_m,
+  start,
+  waypoints,
+  pois,
+  config,
+  name = "",
+  notes = "",
+  takeoff_alt_m,
 }: BuildRouteRequestOptions): Record<string, unknown> {
   const req: Record<string, unknown> = {
-    name, notes, start, landing: start, waypoints,
-    pois: pois.map((poi) => ({ point: poi.point, maneuver: poi.maneuver, name: poi.name || undefined })),
+    name,
+    notes,
+    start,
+    landing: start,
+    waypoints,
+    pois: pois.map((poi) => ({
+      point: poi.point,
+      maneuver: poi.maneuver,
+      name: poi.name || undefined,
+    })),
     config,
   };
   if (takeoff_alt_m !== undefined) req.takeoff_alt_m = takeoff_alt_m;
@@ -115,7 +147,7 @@ export function buildRouteRequest({
 /** Fetch the elevation heatmap PNG for a file in a session. */
 export async function fetchElevationImage(
   sessionId: string,
-  filename: string,
+  filename: string
 ): Promise<{ url: string | null; error: string | null }> {
   try {
     const res = await fetch(`/elevation-image/${sessionId}/${encodeURIComponent(filename)}`);
@@ -130,7 +162,7 @@ export async function fetchElevationImage(
 export async function downloadPdfReport(
   sessionId: string,
   operatorName: string,
-  organization: string,
+  organization: string
 ): Promise<Blob> {
   const res = await fetch(`/plan/${sessionId}/pdf`, {
     method: "POST",
@@ -162,7 +194,7 @@ export async function fetchEditorData(sessionId: string): Promise<{
 /** Apply manually-edited altitude overrides; returns updated ZIP blob + refreshed PlanMeta. */
 export async function applyAltitudeEdit(
   sessionId: string,
-  altOverrides: number[],
+  altOverrides: number[]
 ): Promise<{ blob: Blob; meta: PlanMeta | null }> {
   const res = await fetch(`/plan/${sessionId}/altitude-edit`, {
     method: "POST",
@@ -211,7 +243,9 @@ export async function fetchMissionPlan(folder: string): Promise<{
     }
     const aglFile = zip.file("agl_profile.json");
     if (aglFile) aglProfile = JSON.parse(await aglFile.async("text")) as number[];
-  } catch { /* ignore parse errors */ }
+  } catch {
+    /* ignore parse errors */
+  }
   return { blob, meta, routePoints, aglProfile };
 }
 
@@ -233,7 +267,7 @@ export async function fetchFolderEditorData(folder: string): Promise<{
 /** Apply altitude overrides to a saved plan (no active session required). */
 export async function applyFolderAltitudeEdit(
   folder: string,
-  altOverrides: number[],
+  altOverrides: number[]
 ): Promise<{ blob: Blob; meta: PlanMeta | null }> {
   const res = await fetch(`/missions/${encodeURIComponent(folder)}/altitude-edit`, {
     method: "POST",

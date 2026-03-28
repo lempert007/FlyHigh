@@ -5,19 +5,21 @@ All routes are prefixed with /missions.
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import zipfile
-import io
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
-import config
 import session as session_store
 from core.altitude_edit_utils import patch_plan_zip
 from core.missions import (
+    _plan_zip_path,
+    _thumbnail_path,
+    _validate_folder,
     create_mission,
     delete_mission,
     list_missions,
@@ -25,9 +27,6 @@ from core.missions import (
     load_plan_meta,
     save_mission,
     save_plan,
-    _plan_zip_path,
-    _thumbnail_path,
-    _validate_folder,
 )
 from export.packager import strip_internal_files
 from models import (
@@ -134,8 +133,17 @@ async def get_mission_editor_data(folder: str) -> dict:
             wps = json.loads(zf.read("waypoints.json"))
             agl = [round(float(v), 2) for v in json.loads(zf.read("agl_profile.json"))]
             poi_bands = json.loads(zf.read("poi_bands.json")) if "poi_bands.json" in names else None
-            wp_indices = json.loads(zf.read("waypoint_indices.json")) if "waypoint_indices.json" in names else None
-        return {"waypoints": wps, "agl_profile": agl, "poi_bands": poi_bands, "waypoint_indices": wp_indices}
+            wp_indices = (
+                json.loads(zf.read("waypoint_indices.json"))
+                if "waypoint_indices.json" in names
+                else None
+            )
+        return {
+            "waypoints": wps,
+            "agl_profile": agl,
+            "poi_bands": poi_bands,
+            "waypoint_indices": wp_indices,
+        }
     except KeyError:
         raise HTTPException(409, "Plan ZIP is missing required files — re-plan the route.")
 
@@ -158,6 +166,7 @@ async def apply_folder_altitude_edit(folder: str, body: AltEditBody) -> Streamin
         wps = json.loads(zf.read("waypoints.json"))
         old_agl = np.array(json.loads(zf.read("agl_profile.json")), dtype=float)
         from models import PlanMeta
+
         meta = PlanMeta(**json.loads(zf.read("meta.json")))
 
     old_alts = np.array([wp["alt_m"] for wp in wps], dtype=float)
@@ -183,7 +192,8 @@ async def apply_folder_altitude_edit(folder: str, body: AltEditBody) -> Streamin
     save_plan(folder, new_zip_bytes)
     user_zip = strip_internal_files(new_zip_bytes)
     return StreamingResponse(
-        iter([user_zip]), media_type="application/zip",
+        iter([user_zip]),
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="flyhigh_edited_{folder[:8]}.zip"'},
     )
 

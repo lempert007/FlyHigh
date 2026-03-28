@@ -24,7 +24,6 @@ from core.safety import check_route_safety
 from core.terrain import sample_elevation as _sample_elevation
 from core.types import (
     AltitudeBand,
-    FlightParams,
     LatLon,
     MissionInput,
     MissionResult,
@@ -38,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 # ── Coordinate utilities (kept public for plan.py) ────────────────────────────
 
+
 def detect_mission_zone(points: list[PointLatLon]) -> str:
     """Determine the single UTM zone for a list of lat/lon points."""
     if not points:
@@ -49,6 +49,7 @@ def detect_mission_zone(points: list[PointLatLon]) -> str:
 
 
 # ── Heading and distance utilities ────────────────────────────────────────────
+
 
 def compute_headings(utm_points: np.ndarray) -> np.ndarray:
     """Compute forward bearing (degrees, 0=North) at each point."""
@@ -79,6 +80,7 @@ def total_path_length(utm_points: np.ndarray) -> float:
 
 
 # ── Densification ─────────────────────────────────────────────────────────────
+
 
 def densify_waypoints_3d(
     key_waypoints: list[Waypoint3D],
@@ -112,8 +114,8 @@ def densify_waypoints_3d(
     n_pts = max(2, math.ceil(total_len / spacing_m) + 1)
     sample_dists = np.linspace(0.0, total_len, n_pts)
 
-    dense_e   = np.interp(sample_dists, cum_dist, utm_arr[:, 0])
-    dense_n   = np.interp(sample_dists, cum_dist, utm_arr[:, 1])
+    dense_e = np.interp(sample_dists, cum_dist, utm_arr[:, 0])
+    dense_n = np.interp(sample_dists, cum_dist, utm_arr[:, 1])
     dense_alt = np.interp(sample_dists, cum_dist, alts_arr)
 
     # Assign action from the nearest key waypoint using binary search
@@ -125,21 +127,24 @@ def densify_waypoints_3d(
     result: list[Waypoint3D] = []
     for i in range(n_pts):
         lat, lon = utm_to_latlon(float(dense_e[i]), float(dense_n[i]), zone_str)
-        result.append(Waypoint3D(
-            lat=lat,
-            lon=lon,
-            alt_msl=float(dense_alt[i]),
-            action=actions[int(indices[i])],
-        ))
+        result.append(
+            Waypoint3D(
+                lat=lat,
+                lon=lon,
+                alt_msl=float(dense_alt[i]),
+                action=actions[int(indices[i])],
+            )
+        )
 
     return result
 
 
 # ── Smart Route (lateral path shift) ─────────────────────────────────────────
 
+
 def _smart_route_lateral(
     key_waypoints: list[Waypoint3D],
-    dtm: "TerrainIndex",
+    dtm: TerrainIndex,
     corridor_m: float,
 ) -> tuple[list[Waypoint3D], str]:
     """Shift transit legs laterally to seek flatter terrain.
@@ -174,9 +179,7 @@ def _smart_route_lateral(
         blocks_analysed += 1
         block_len = j - i
         if block_len > 4:
-            block_utm = np.array(
-                [utm.from_latlon(w.lat, w.lon)[:2] for w in pts[i:j]], dtype=float
-            )
+            block_utm = np.array([utm.from_latlon(w.lat, w.lon)[:2] for w in pts[i:j]], dtype=float)
             axis = block_utm[-1] - block_utm[0]
             axis_len = float(np.linalg.norm(axis))
             if axis_len > 1e-6:
@@ -203,7 +206,9 @@ def _smart_route_lateral(
                     for k, (e, n_) in enumerate(shifted_block):
                         lat, lon = utm_to_latlon(float(e), float(n_), zone_str3)
                         old = pts[i + k]
-                        pts[i + k] = Waypoint3D(lat=lat, lon=lon, alt_msl=old.alt_msl, action=old.action)
+                        pts[i + k] = Waypoint3D(
+                            lat=lat, lon=lon, alt_msl=old.alt_msl, action=old.action
+                        )
                     shift_offsets.append(abs(best_offset))
 
         i = j
@@ -221,6 +226,7 @@ def _smart_route_lateral(
 
 
 # ── Plan route (main entry point) ─────────────────────────────────────────────
+
 
 def plan_route(mission: MissionInput) -> MissionResult:
     """Execute the full mission planning pipeline.
@@ -284,7 +290,8 @@ def plan_route(mission: MissionInput) -> MissionResult:
 
     logger.info(
         "2-D path: %d waypoints (%d POI zones), start=%s, landing=%s",
-        len(waypoints_2d), len(ordered_zones),
+        len(waypoints_2d),
+        len(ordered_zones),
         f"({mission.start.lat:.4f},{mission.start.lon:.4f})",
         f"({mission.landing.lat:.4f},{mission.landing.lon:.4f})",
     )
@@ -309,11 +316,11 @@ def plan_route(mission: MissionInput) -> MissionResult:
     if params.smart_route_corridor_m is not None and len(key_wps) > 4:
         # Densify original key waypoints so we can produce a before/after diff
         pre_dense = densify_waypoints_3d(key_wps, params.spacing_m)
-        pre_smart_route_utm = np.array([
-            list(utm.from_latlon(w.lat, w.lon)[:2]) for w in pre_dense
-        ])
+        pre_smart_route_utm = np.array([list(utm.from_latlon(w.lat, w.lon)[:2]) for w in pre_dense])
         key_wps, smart_route_summary = _smart_route_lateral(
-            key_wps, dtm, params.smart_route_corridor_m,
+            key_wps,
+            dtm,
+            params.smart_route_corridor_m,
         )
 
     # ── Step 7: Densify ───────────────────────────────────────────────────────
@@ -321,13 +328,12 @@ def plan_route(mission: MissionInput) -> MissionResult:
     logger.info("Dense waypoints: %d at %.1f m spacing", len(dense_wps), params.spacing_m)
 
     # ── Step 8: Safety checks ─────────────────────────────────────────────────
-    dense_utm = np.array([
-        list(utm.from_latlon(w.lat, w.lon)[:2]) for w in dense_wps
-    ])
+    dense_utm = np.array([list(utm.from_latlon(w.lat, w.lon)[:2]) for w in dense_wps])
     bubble_terrain = mission.bubble_terrain if mission.bubble_terrain is not None else dsm
     camera_terrain = mission.camera_terrain if mission.camera_terrain is not None else dsm
     safety_violations = check_route_safety(
-        dense_wps, dense_utm,
+        dense_wps,
+        dense_utm,
         vertical_terrain=dsm,
         bubble_terrain=bubble_terrain,
         camera_terrain=camera_terrain,
@@ -344,7 +350,10 @@ def plan_route(mission: MissionInput) -> MissionResult:
 
     logger.info(
         "Route complete: %.0f m, %.0f s, %.1f Wh (%.0f%% battery)",
-        total_dist_m, flight_time_s, energy_wh, budget_pct,
+        total_dist_m,
+        flight_time_s,
+        energy_wh,
+        budget_pct,
     )
 
     return MissionResult(
@@ -356,9 +365,7 @@ def plan_route(mission: MissionInput) -> MissionResult:
         energy_wh=round(energy_wh, 2),
         budget_pct=round(budget_pct, 1),
         terrain_resolution_m=getattr(dsm, "resolution_m", None),
-        covered_area_m2=None,    # computed in plan.py from maneuver parameters
+        covered_area_m2=None,  # computed in plan.py from maneuver parameters
         smart_route_summary=smart_route_summary,
         pre_smart_route_utm=pre_smart_route_utm,
     )
-
-

@@ -13,16 +13,23 @@ interface StartPointSectionProps {
 
 /** Start point indicator + takeoff altitude mode. */
 export function StartPointSection({
-  start, placeMode, takeoffMode, takeoffAltM,
-  onSetPlaceMode, onTakeoffModeChange, onTakeoffAltChange,
+  start,
+  placeMode,
+  takeoffMode,
+  takeoffAltM,
+  onSetPlaceMode,
+  onTakeoffModeChange,
+  onTakeoffAltChange,
 }: StartPointSectionProps) {
   return (
     <Stack spacing={1} data-tutorial="home">
       <Box
         sx={{
-          p: 1, border: "1px solid",
+          p: 1,
+          border: "1px solid",
           borderColor: start ? "success.dark" : "divider",
-          borderRadius: 1, cursor: "pointer",
+          borderRadius: 1,
+          cursor: "pointer",
           bgcolor: placeMode === "start" ? "action.selected" : "transparent",
           "&:hover": { borderColor: "success.main" },
         }}
@@ -41,8 +48,17 @@ export function StartPointSection({
             size="small"
             value={takeoffMode}
             exclusive
-            onChange={(_, v) => { if (v) onTakeoffModeChange(v); }}
-            sx={{ "& .MuiToggleButton-root": { textTransform: "none", fontSize: "0.7rem", py: 0.25, px: 1 } }}
+            onChange={(_, v) => {
+              if (v) onTakeoffModeChange(v);
+            }}
+            sx={{
+              "& .MuiToggleButton-root": {
+                textTransform: "none",
+                fontSize: "0.7rem",
+                py: 0.25,
+                px: 1,
+              },
+            }}
           >
             <ToggleButton value="auto">Auto (terrain)</ToggleButton>
             <ToggleButton value="fixed">Fixed MSL</ToggleButton>
@@ -60,7 +76,6 @@ export function StartPointSection({
           )}
         </Stack>
       )}
-
     </Stack>
   );
 }

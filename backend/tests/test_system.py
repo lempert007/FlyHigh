@@ -10,12 +10,10 @@ import json
 import statistics
 import zipfile
 
-import pytest
-
-from tests.conftest import make_request, plan, upload, CENTER_LAT, CENTER_LON
-
+from tests.conftest import CENTER_LAT, CENTER_LON, make_request, plan, upload
 
 # ── 1. Full pipeline ──────────────────────────────────────────────────────────
+
 
 async def test_full_pipeline_returns_valid_zip(client, flat_tiff):
     """
@@ -26,12 +24,17 @@ async def test_full_pipeline_returns_valid_zip(client, flat_tiff):
 
     resp = await client.post("/plan", json=make_request(session_id))
     assert resp.status_code == 200
-    meta  = json.loads(resp.headers["X-Plan-Meta"])
-    zf    = zipfile.ZipFile(io.BytesIO(resp.content))
+    meta = json.loads(resp.headers["X-Plan-Meta"])
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
     waypoints = json.loads(zf.read("waypoints.json"))
 
     # ZIP must contain all four standard outputs
-    assert set(zf.namelist()) >= {"waypoints.json", "mission_report.html", "mission_log.txt", "waypoints.kml"}
+    assert set(zf.namelist()) >= {
+        "waypoints.json",
+        "mission_report.html",
+        "mission_log.txt",
+        "waypoints.kml",
+    }
 
     # Waypoints must be a non-empty list with the expected fields
     assert len(waypoints) > 0
@@ -46,6 +49,7 @@ async def test_full_pipeline_returns_valid_zip(client, flat_tiff):
 
 # ── 2. Terrain-following altitude — flat ─────────────────────────────────────
 
+
 async def test_altitude_follows_flat_terrain(client, flat_tiff):
     """
     On a flat 100 m raster with min_agl=30, every planned waypoint should be
@@ -58,20 +62,21 @@ async def test_altitude_follows_flat_terrain(client, flat_tiff):
     altitudes = [wp["alt_m"] for wp in waypoints]
 
     # All altitudes should be at or above the AGL floor
-    assert all(alt >= 125 for alt in altitudes), (
-        f"Some waypoints are below terrain + min_agl. Min found: {min(altitudes):.1f} m"
-    )
+    assert all(
+        alt >= 125 for alt in altitudes
+    ), f"Some waypoints are below terrain + min_agl. Min found: {min(altitudes):.1f} m"
     # None should exceed the AGL ceiling
-    assert all(alt <= 225 for alt in altitudes), (
-        f"Some waypoints exceed terrain + max_agl. Max found: {max(altitudes):.1f} m"
-    )
+    assert all(
+        alt <= 225 for alt in altitudes
+    ), f"Some waypoints exceed terrain + max_agl. Max found: {max(altitudes):.1f} m"
     # On flat terrain the spread should be tight — within 20 m of each other
-    assert max(altitudes) - min(altitudes) < 20, (
-        f"Altitude spread too wide on flat terrain: {max(altitudes) - min(altitudes):.1f} m"
-    )
+    assert (
+        max(altitudes) - min(altitudes) < 20
+    ), f"Altitude spread too wide on flat terrain: {max(altitudes) - min(altitudes):.1f} m"
 
 
 # ── 3. Terrain-following altitude — ramp ─────────────────────────────────────
+
 
 async def test_altitude_follows_ramp_terrain(client, ramp_tiff):
     """
@@ -83,9 +88,12 @@ async def test_altitude_follows_ramp_terrain(client, ramp_tiff):
     session_id, _ = await upload(client, ("terrain.tif", ramp_tiff))
     req = make_request(
         session_id,
-        start_lat=CENTER_LAT - 0.004, start_lon=CENTER_LON,
-        width_m=300, height_m=200,
-        min_agl=30, max_agl=200,
+        start_lat=CENTER_LAT - 0.004,
+        start_lon=CENTER_LON,
+        width_m=300,
+        height_m=200,
+        min_agl=30,
+        max_agl=200,
     )
     _, waypoints = await plan(client, req)
 
@@ -105,6 +113,7 @@ async def test_altitude_follows_ramp_terrain(client, ramp_tiff):
 
 
 # ── 4. Lawnmower coverage stays inside POI bounds ────────────────────────────
+
 
 async def test_lawnmower_waypoints_stay_inside_poi_bounds(client, flat_tiff):
     """
@@ -137,15 +146,17 @@ async def test_lawnmower_waypoints_stay_inside_poi_bounds(client, flat_tiff):
     assert len(coverage) > 0, "No coverage waypoints found"
 
     out_of_bounds = [
-        wp for wp in coverage
+        wp
+        for wp in coverage
         if not (lat_lo <= wp["lat"] <= lat_hi and lon_lo <= wp["lon"] <= lon_hi)
     ]
-    assert out_of_bounds == [], (
-        f"{len(out_of_bounds)} coverage waypoints are outside the expected POI bounding box"
-    )
+    assert (
+        out_of_bounds == []
+    ), f"{len(out_of_bounds)} coverage waypoints are outside the expected POI bounding box"
 
 
 # ── 5. Safety violations on spike terrain ────────────────────────────────────
+
 
 async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_dsm_tiff):
     """
@@ -165,9 +176,12 @@ async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_ds
         client,
         make_request(
             session_id,
-            poi_lat=CENTER_LAT, poi_lon=CENTER_LON,  # centred on the spike
-            width_m=300, height_m=300,
-            min_agl=30, max_agl=80,
+            poi_lat=CENTER_LAT,
+            poi_lon=CENTER_LON,  # centred on the spike
+            width_m=300,
+            height_m=300,
+            min_agl=30,
+            max_agl=80,
         ),
     )
 
@@ -180,6 +194,7 @@ async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_ds
 
 
 # ── 6. POI outside raster — graceful degradation ─────────────────────────────
+
 
 async def test_poi_outside_raster_degrades_gracefully(client, flat_tiff):
     """
@@ -194,9 +209,9 @@ async def test_poi_outside_raster_degrades_gracefully(client, flat_tiff):
         # raster centre — well outside the 0.05° raster extent
         json=make_request(session_id, poi_lat=37.0, poi_lon=34.8),
     )
-    assert resp.status_code == 200, (
-        f"Planner crashed instead of degrading gracefully: {resp.text[:300]}"
-    )
+    assert (
+        resp.status_code == 200
+    ), f"Planner crashed instead of degrading gracefully: {resp.text[:300]}"
 
     meta = json.loads(resp.headers["X-Plan-Meta"])
     # Outside-raster terrain falls back to a fixed altitude, causing AGL clearance
@@ -208,6 +223,7 @@ async def test_poi_outside_raster_degrades_gracefully(client, flat_tiff):
 
 
 # ── 7. Battery overrun — plan always delivered ───────────────────────────────
+
 
 async def test_battery_overrun_still_returns_plan(client, flat_tiff):
     """
@@ -230,6 +246,7 @@ async def test_battery_overrun_still_returns_plan(client, flat_tiff):
 
 # ── 8. Greedy POI reorder reduces transit distance ───────────────────────────
 
+
 async def test_greedy_poi_reorder_reduces_distance(client, flat_tiff):
     """
     Three POIs arranged so the naive order (far → near → middle) has long backtracking.
@@ -246,16 +263,26 @@ async def test_greedy_poi_reorder_reduces_distance(client, flat_tiff):
         {"lat": 32.51, "lon": 34.802, "w": 100, "h": 100},  # centre-north
     ]
 
-    meta_naive, _      = await plan(client, make_request(
-        session_id,
-        start_lat=32.478, start_lon=34.778,
-        pois=pois_naive, optimize_order=False,
-    ))
-    meta_optimized, _  = await plan(client, make_request(
-        session_id,
-        start_lat=32.478, start_lon=34.778,
-        pois=pois_naive, optimize_order=True,
-    ))
+    meta_naive, _ = await plan(
+        client,
+        make_request(
+            session_id,
+            start_lat=32.478,
+            start_lon=34.778,
+            pois=pois_naive,
+            optimize_order=False,
+        ),
+    )
+    meta_optimized, _ = await plan(
+        client,
+        make_request(
+            session_id,
+            start_lat=32.478,
+            start_lon=34.778,
+            pois=pois_naive,
+            optimize_order=True,
+        ),
+    )
 
     assert meta_optimized["total_distance_m"] <= meta_naive["total_distance_m"], (
         f"Optimized route ({meta_optimized['total_distance_m']:.0f} m) is longer than "
@@ -264,6 +291,7 @@ async def test_greedy_poi_reorder_reduces_distance(client, flat_tiff):
 
 
 # ── 9. Altitude step smoothing reduces staircase ─────────────────────────────
+
 
 async def test_min_altitude_step_reduces_staircase(client, ramp_tiff):
     """
@@ -282,12 +310,12 @@ async def test_min_altitude_step_reduces_staircase(client, ramp_tiff):
         max_agl=200,
     )
 
-    _, wps_no_smooth  = await plan(client, make_request(session_id, min_step_m=0,  **base_req))
-    _, wps_smoothed   = await plan(client, make_request(session_id, min_step_m=10, **base_req))
+    _, wps_no_smooth = await plan(client, make_request(session_id, min_step_m=0, **base_req))
+    _, wps_smoothed = await plan(client, make_request(session_id, min_step_m=10, **base_req))
 
     # Count distinct altitude levels (rounded to 1 decimal to ignore float noise)
     distinct_no_smooth = len({round(wp["alt_m"], 1) for wp in wps_no_smooth})
-    distinct_smoothed  = len({round(wp["alt_m"], 1) for wp in wps_smoothed})
+    distinct_smoothed = len({round(wp["alt_m"], 1) for wp in wps_smoothed})
 
     assert distinct_smoothed < distinct_no_smooth, (
         f"Smoothed plan ({distinct_smoothed} distinct altitudes) should have fewer "

@@ -77,6 +77,7 @@ LAWNMOWER_TURN_OVERLAP: float = 0.10
 
 # ── Mission library ───────────────────────────────────────────────────────────
 from pathlib import Path as _Path
+
 MISSIONS_ROOT: _Path = _Path(__file__).parent / "missions"
 """Root folder where mission sub-directories are stored."""
 

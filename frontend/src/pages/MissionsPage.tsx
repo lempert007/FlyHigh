@@ -39,16 +39,23 @@ type FilterStatus = "all" | MissionStatus;
 
 function StatusBadge({ status }: { status: MissionStatus }) {
   const color = STATUS_COLOR[status] ?? STATUS_COLOR.draft;
-  const bg    = STATUS_BG[status]    ?? STATUS_BG.draft;
+  const bg = STATUS_BG[status] ?? STATUS_BG.draft;
   const label = STATUS_LABEL[status] ?? STATUS_LABEL.draft;
   return (
     <Box
       sx={{
-        display: "inline-flex", alignItems: "center",
-        px: 1, py: 0.25, borderRadius: "999px",
-        bgcolor: bg, border: `1px solid ${color}33`,
-        fontSize: "0.65rem", fontWeight: 700, letterSpacing: "0.05em",
-        textTransform: "uppercase", color,
+        display: "inline-flex",
+        alignItems: "center",
+        px: 1,
+        py: 0.25,
+        borderRadius: "999px",
+        bgcolor: bg,
+        border: `1px solid ${color}33`,
+        fontSize: "0.65rem",
+        fontWeight: 700,
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        color,
         lineHeight: 1.6,
       }}
     >
@@ -58,21 +65,35 @@ function StatusBadge({ status }: { status: MissionStatus }) {
 }
 
 function FilterChip({
-  label, active, onClick,
-}: { label: string; active: boolean; onClick: () => void }) {
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
   return (
     <Box
       onClick={onClick}
       sx={{
-        px: 1.5, py: 0.5, borderRadius: "999px", cursor: "pointer",
-        fontSize: "0.72rem", fontWeight: 600, letterSpacing: "0.03em",
+        px: 1.5,
+        py: 0.5,
+        borderRadius: "999px",
+        cursor: "pointer",
+        fontSize: "0.72rem",
+        fontWeight: 600,
+        letterSpacing: "0.03em",
         userSelect: "none",
         transition: "all 0.15s",
         border: "1px solid",
         borderColor: active ? "#1E90FF" : "#21262d",
         bgcolor: active ? "rgba(30,144,255,0.12)" : "transparent",
         color: active ? "#1E90FF" : "#8b949e",
-        "&:hover": { borderColor: active ? "#1E90FF" : "#444c56", color: active ? "#1E90FF" : "#cdd9e5" },
+        "&:hover": {
+          borderColor: active ? "#1E90FF" : "#444c56",
+          color: active ? "#1E90FF" : "#cdd9e5",
+        },
       }}
     >
       {label}
@@ -86,7 +107,10 @@ function CardMenu({ folder, onDelete }: { folder: string; onDelete: (f: string) 
     <>
       <IconButton
         size="small"
-        onClick={(e) => { e.stopPropagation(); setAnchor(e.currentTarget); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setAnchor(e.currentTarget);
+        }}
         sx={{ color: "#444c56", "&:hover": { color: "#8b949e" }, p: 0.5 }}
       >
         <MoreVertIcon sx={{ fontSize: 16 }} />
@@ -96,12 +120,24 @@ function CardMenu({ folder, onDelete }: { folder: string; onDelete: (f: string) 
         open={!!anchor}
         onClose={() => setAnchor(null)}
         PaperProps={{
-          sx: { bgcolor: "#161b22", border: "1px solid #21262d", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", minWidth: 140 },
+          sx: {
+            bgcolor: "#161b22",
+            border: "1px solid #21262d",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+            minWidth: 140,
+          },
         }}
       >
         <MenuItem
-          onClick={() => { setAnchor(null); if (window.confirm("Delete this mission? This cannot be undone.")) onDelete(folder); }}
-          sx={{ fontSize: "0.8rem", color: "#f85149", "&:hover": { bgcolor: "rgba(248,81,73,0.08)" } }}
+          onClick={() => {
+            setAnchor(null);
+            if (window.confirm("Delete this mission? This cannot be undone.")) onDelete(folder);
+          }}
+          sx={{
+            fontSize: "0.8rem",
+            color: "#f85149",
+            "&:hover": { bgcolor: "rgba(248,81,73,0.08)" },
+          }}
         >
           Delete mission
         </MenuItem>
@@ -112,7 +148,9 @@ function CardMenu({ folder, onDelete }: { folder: string; onDelete: (f: string) 
 
 // ── Route thumbnail SVG ───────────────────────────────────────────────────────
 
-const SVG_W = 400, SVG_H = 150, PAD = 18;
+const SVG_W = 400,
+  SVG_H = 150,
+  PAD = 18;
 
 function RouteThumbnail({ preview }: { preview: RoutePreview | null | undefined }) {
   const allPts = [
@@ -122,19 +160,38 @@ function RouteThumbnail({ preview }: { preview: RoutePreview | null | undefined 
   ];
 
   const placeholder = (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: "100%", height: "100%", display: "block" }}>
+    <svg
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      style={{ width: "100%", height: "100%", display: "block" }}
+    >
       <rect width={SVG_W} height={SVG_H} fill="#0d1117" />
-      <ellipse cx={SVG_W / 2} cy={SVG_H / 2} rx={80} ry={40} fill="none" stroke="#1E90FF" strokeWidth="1" strokeOpacity="0.08" />
+      <ellipse
+        cx={SVG_W / 2}
+        cy={SVG_H / 2}
+        rx={80}
+        ry={40}
+        fill="none"
+        stroke="#1E90FF"
+        strokeWidth="1"
+        strokeOpacity="0.08"
+      />
       {/* Drone placeholder icon centred in the thumbnail */}
-      <g transform={`translate(${SVG_W / 2 - 22}, ${SVG_H / 2 - 22}) scale(1.83)`} stroke="#1E90FF" fill="none" strokeLinecap="round" strokeLinejoin="round" opacity="0.12">
-        <line x1="9.5"  y1="9.5"  x2="5"  y2="5"  strokeWidth="1.6" />
-        <line x1="14.5" y1="9.5"  x2="19" y2="5"  strokeWidth="1.6" />
-        <line x1="9.5"  y1="14.5" x2="5"  y2="19" strokeWidth="1.6" />
+      <g
+        transform={`translate(${SVG_W / 2 - 22}, ${SVG_H / 2 - 22}) scale(1.83)`}
+        stroke="#1E90FF"
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        opacity="0.12"
+      >
+        <line x1="9.5" y1="9.5" x2="5" y2="5" strokeWidth="1.6" />
+        <line x1="14.5" y1="9.5" x2="19" y2="5" strokeWidth="1.6" />
+        <line x1="9.5" y1="14.5" x2="5" y2="19" strokeWidth="1.6" />
         <line x1="14.5" y1="14.5" x2="19" y2="19" strokeWidth="1.6" />
         <rect x="9.5" y="9.5" width="5" height="5" rx="1.2" strokeWidth="1.6" />
-        <circle cx="4"  cy="4"  r="2.4" strokeWidth="1.5" />
-        <circle cx="20" cy="4"  r="2.4" strokeWidth="1.5" />
-        <circle cx="4"  cy="20" r="2.4" strokeWidth="1.5" />
+        <circle cx="4" cy="4" r="2.4" strokeWidth="1.5" />
+        <circle cx="20" cy="4" r="2.4" strokeWidth="1.5" />
+        <circle cx="4" cy="20" r="2.4" strokeWidth="1.5" />
         <circle cx="20" cy="20" r="2.4" strokeWidth="1.5" />
         <circle cx="12" cy="12" r="1.1" strokeWidth="1.2" />
       </g>
@@ -145,8 +202,10 @@ function RouteThumbnail({ preview }: { preview: RoutePreview | null | undefined 
 
   const lats = allPts.map((p) => p.lat);
   const lons = allPts.map((p) => p.lon);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const minLat = Math.min(...lats),
+    maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons),
+    maxLon = Math.max(...lons);
 
   const latSpan = maxLat - minLat || 0.005;
   const lonSpan = maxLon - minLon || 0.005;
@@ -159,18 +218,42 @@ function RouteThumbnail({ preview }: { preview: RoutePreview | null | undefined 
   const toY = (lat: number) => PAD + offsetY + (maxLat - lat) * scale;
 
   const wps = preview?.waypoints ?? [];
-  const routeD = wps.length > 1
-    ? `M ${wps.map((p) => `${toX(p.lon).toFixed(1)},${toY(p.lat).toFixed(1)}`).join(" L ")}`
-    : null;
+  const routeD =
+    wps.length > 1
+      ? `M ${wps.map((p) => `${toX(p.lon).toFixed(1)},${toY(p.lat).toFixed(1)}`).join(" L ")}`
+      : null;
 
   return (
-    <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} style={{ width: "100%", height: "100%", display: "block" }}>
+    <svg
+      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+      style={{ width: "100%", height: "100%", display: "block" }}
+    >
       <rect width={SVG_W} height={SVG_H} fill="#0d1117" />
 
       {/* Glow line (wider, transparent) */}
-      {routeD && <path d={routeD} fill="none" stroke="#1E90FF" strokeWidth="6" strokeOpacity="0.18" strokeLinecap="round" strokeLinejoin="round" />}
+      {routeD && (
+        <path
+          d={routeD}
+          fill="none"
+          stroke="#1E90FF"
+          strokeWidth="6"
+          strokeOpacity="0.18"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
       {/* Route line */}
-      {routeD && <path d={routeD} fill="none" stroke="#4fc3f7" strokeWidth="1.8" strokeOpacity="0.85" strokeLinecap="round" strokeLinejoin="round" />}
+      {routeD && (
+        <path
+          d={routeD}
+          fill="none"
+          stroke="#4fc3f7"
+          strokeWidth="1.8"
+          strokeOpacity="0.85"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
 
       {/* Waypoints */}
       {wps.map((p, i) => (
@@ -179,19 +262,41 @@ function RouteThumbnail({ preview }: { preview: RoutePreview | null | undefined 
 
       {/* POIs */}
       {(preview?.pois ?? []).map((p, i) => {
-        const x = toX(p.lon), y = toY(p.lat);
-        return <rect key={i} x={x - 4} y={y - 4} width="8" height="8" rx="1.5" fill="#ff9800" opacity="0.9" />;
+        const x = toX(p.lon),
+          y = toY(p.lat);
+        return (
+          <rect
+            key={i}
+            x={x - 4}
+            y={y - 4}
+            width="8"
+            height="8"
+            rx="1.5"
+            fill="#ff9800"
+            opacity="0.9"
+          />
+        );
       })}
 
       {/* Start */}
       {preview?.start && (
-        <circle cx={toX(preview.start.lon)} cy={toY(preview.start.lat)} r="5" fill="#ef5350" opacity="0.95" />
+        <circle
+          cx={toX(preview.start.lon)}
+          cy={toY(preview.start.lat)}
+          r="5"
+          fill="#ef5350"
+          opacity="0.95"
+        />
       )}
     </svg>
   );
 }
 
-function MissionCard({ mission, onOpen, onDelete }: {
+function MissionCard({
+  mission,
+  onOpen,
+  onDelete,
+}: {
   mission: MissionSummary;
   onOpen: (folder: string) => void;
   onDelete: (folder: string) => void;
@@ -207,7 +312,8 @@ function MissionCard({ mission, onOpen, onDelete }: {
         borderRadius: 2,
         overflow: "hidden",
         cursor: "pointer",
-        display: "flex", flexDirection: "column",
+        display: "flex",
+        flexDirection: "column",
         transition: "border-color 0.18s, box-shadow 0.18s, transform 0.18s",
         "&:hover": {
           borderColor: "#1E90FF44",
@@ -228,8 +334,12 @@ function MissionCard({ mission, onOpen, onDelete }: {
       <Box sx={{ p: 1.5, flex: 1, display: "flex", flexDirection: "column", gap: 0.5 }}>
         <Typography
           sx={{
-            fontSize: "0.85rem", fontWeight: 600, color: "#cdd9e5",
-            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            fontSize: "0.85rem",
+            fontWeight: 600,
+            color: "#cdd9e5",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
           {mission.name}
@@ -242,8 +352,11 @@ function MissionCard({ mission, onOpen, onDelete }: {
       {/* Footer */}
       <Box
         sx={{
-          px: 1.5, pb: 1.25,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
+          px: 1.5,
+          pb: 1.25,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -256,7 +369,9 @@ function MissionCard({ mission, onOpen, onDelete }: {
 
 function CardSkeleton() {
   return (
-    <Box sx={{ bgcolor: "#161b22", border: "1px solid #21262d", borderRadius: 2, overflow: "hidden" }}>
+    <Box
+      sx={{ bgcolor: "#161b22", border: "1px solid #21262d", borderRadius: 2, overflow: "hidden" }}
+    >
       <Skeleton variant="rectangular" height={130} sx={{ bgcolor: "#21262d" }} />
       <Box sx={{ p: 1.5 }}>
         <Skeleton variant="text" width="65%" sx={{ bgcolor: "#21262d", mb: 0.5 }} />
@@ -270,16 +385,25 @@ function EmptyState({ hasSearch, onCreate }: { hasSearch: boolean; onCreate: () 
   return (
     <Box
       sx={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", mt: 10, gap: 2,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        mt: 10,
+        gap: 2,
       }}
     >
       <Box sx={{ position: "relative", mb: 1 }}>
         <Box
           sx={{
-            width: 72, height: 72, borderRadius: "50%",
-            bgcolor: "rgba(30,144,255,0.07)", border: "1px solid rgba(30,144,255,0.15)",
-            display: "flex", alignItems: "center", justifyContent: "center",
+            width: 72,
+            height: 72,
+            borderRadius: "50%",
+            bgcolor: "rgba(30,144,255,0.07)",
+            border: "1px solid rgba(30,144,255,0.15)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           <DroneIcon sx={{ fontSize: 32, color: "#1E90FF", opacity: 0.5 }} />
@@ -300,8 +424,14 @@ function EmptyState({ hasSearch, onCreate }: { hasSearch: boolean; onCreate: () 
           startIcon={<AddIcon />}
           onClick={onCreate}
           sx={{
-            textTransform: "none", borderColor: "#21262d", color: "#8b949e",
-            "&:hover": { borderColor: "#1E90FF", color: "#1E90FF", bgcolor: "rgba(30,144,255,0.06)" },
+            textTransform: "none",
+            borderColor: "#21262d",
+            color: "#8b949e",
+            "&:hover": {
+              borderColor: "#1E90FF",
+              color: "#1E90FF",
+              bgcolor: "rgba(30,144,255,0.06)",
+            },
           }}
         >
           New Mission
@@ -330,12 +460,18 @@ export default function MissionsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try { setMissions(await listMissions()); }
-    catch (err) { setError(err instanceof Error ? err.message : String(err)); }
-    finally { setLoading(false); }
+    try {
+      setMissions(await listMissions());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleDelete = useCallback(async (folder: string) => {
     try {
@@ -347,25 +483,30 @@ export default function MissionsPage() {
   }, []);
 
   const openDialog = useCallback(() => {
-    setNewName(""); setCreateError(null); setDialogOpen(true);
+    setNewName("");
+    setCreateError(null);
+    setDialogOpen(true);
   }, []);
 
   const handleCreate = useCallback(async () => {
     if (!newName.trim()) return;
-    setCreating(true); setCreateError(null);
+    setCreating(true);
+    setCreateError(null);
     try {
       const { folder } = await createMission(newName.trim());
       setDialogOpen(false);
       navigate(`/missions/${folder}`);
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : "Failed to create mission.");
-    } finally { setCreating(false); }
+    } finally {
+      setCreating(false);
+    }
   }, [newName, navigate]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return missions.filter((m) =>
-      m.name.toLowerCase().includes(q) && (filter === "all" || m.status === filter)
+    return missions.filter(
+      (m) => m.name.toLowerCase().includes(q) && (filter === "all" || m.status === filter)
     );
   }, [missions, search, filter]);
 
@@ -379,20 +520,35 @@ export default function MissionsPage() {
   return (
     <ThemeProvider theme={appTheme}>
       <CssBaseline />
-      <Box sx={{ minHeight: "100vh", bgcolor: "background.default", display: "flex", flexDirection: "column" }}>
-
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: "background.default",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {/* Top bar */}
         <Box
           sx={{
-            height: 56, px: 4, flexShrink: 0,
-            display: "flex", alignItems: "center", gap: 2,
+            height: 56,
+            px: 4,
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
             borderBottom: "1px solid #21262d",
             bgcolor: "#161b22",
           }}
         >
           <DroneIcon sx={{ fontSize: 20, color: "#1E90FF", mr: 0.5 }} />
-          <Typography sx={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "3px", color: "#fff" }}>
-            FLY<Box component="span" sx={{ color: "#1E90FF" }}>HIGH</Box>
+          <Typography
+            sx={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "3px", color: "#fff" }}
+          >
+            FLY
+            <Box component="span" sx={{ color: "#1E90FF" }}>
+              HIGH
+            </Box>
           </Typography>
           <Box sx={{ flex: 1 }} />
           <Tooltip title="Dashboard">
@@ -419,8 +575,11 @@ export default function MissionsPage() {
             startIcon={<AddIcon />}
             onClick={openDialog}
             sx={{
-              textTransform: "none", fontWeight: 600, fontSize: "0.8rem",
-              px: 2, py: 0.75,
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: "0.8rem",
+              px: 2,
+              py: 0.75,
               boxShadow: "0 0 16px rgba(30,144,255,0.2)",
               "&:hover": { boxShadow: "0 0 24px rgba(30,144,255,0.35)" },
             }}
@@ -430,8 +589,17 @@ export default function MissionsPage() {
         </Box>
 
         {/* Content */}
-        <Box sx={{ flex: 1, px: 4, py: 3, maxWidth: 1400, width: "100%", mx: "auto", boxSizing: "border-box" }}>
-
+        <Box
+          sx={{
+            flex: 1,
+            px: 4,
+            py: 3,
+            maxWidth: 1400,
+            width: "100%",
+            mx: "auto",
+            boxSizing: "border-box",
+          }}
+        >
           {/* Page title */}
           <Box sx={{ mb: 3 }}>
             <Typography sx={{ fontSize: "1.25rem", fontWeight: 700, color: "#cdd9e5", mb: 0.25 }}>
@@ -484,7 +652,13 @@ export default function MissionsPage() {
           {/* Error */}
           {error && (
             <Alert
-              severity="error" sx={{ mb: 2, bgcolor: "rgba(248,81,73,0.08)", border: "1px solid rgba(248,81,73,0.3)", color: "#f85149" }}
+              severity="error"
+              sx={{
+                mb: 2,
+                bgcolor: "rgba(248,81,73,0.08)",
+                border: "1px solid rgba(248,81,73,0.3)",
+                color: "#f85149",
+              }}
               onClose={() => setError(null)}
             >
               {error}
@@ -508,8 +682,7 @@ export default function MissionsPage() {
                     onOpen={(f) => navigate(`/missions/${f}`)}
                     onDelete={handleDelete}
                   />
-                ))
-            }
+                ))}
           </Box>
 
           {!loading && filtered.length === 0 && (
@@ -529,7 +702,8 @@ export default function MissionsPage() {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: "#161b22", border: "1px solid #21262d",
+            bgcolor: "#161b22",
+            border: "1px solid #21262d",
             boxShadow: "0 24px 64px rgba(0,0,0,0.7)",
             borderRadius: 2,
           },
@@ -559,7 +733,17 @@ export default function MissionsPage() {
             }}
           />
           {createError && (
-            <Alert severity="error" sx={{ mt: 1.5, py: 0.5, bgcolor: "rgba(248,81,73,0.08)", border: "1px solid rgba(248,81,73,0.2)", color: "#f85149", fontSize: "0.78rem" }}>
+            <Alert
+              severity="error"
+              sx={{
+                mt: 1.5,
+                py: 0.5,
+                bgcolor: "rgba(248,81,73,0.08)",
+                border: "1px solid rgba(248,81,73,0.2)",
+                color: "#f85149",
+                fontSize: "0.78rem",
+              }}
+            >
               {createError}
             </Alert>
           )}
@@ -580,7 +764,8 @@ export default function MissionsPage() {
             disabled={creating || !newName.trim()}
             startIcon={creating ? <CircularProgress size={12} color="inherit" /> : undefined}
             sx={{
-              textTransform: "none", fontWeight: 600,
+              textTransform: "none",
+              fontWeight: 600,
               boxShadow: "none",
               "&:hover": { boxShadow: "0 0 12px rgba(30,144,255,0.3)" },
             }}

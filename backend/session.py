@@ -27,15 +27,17 @@ logger = logging.getLogger(__name__)
 
 # ── Data structures ───────────────────────────────────────────────────────────
 
+
 @dataclass
 class SessionFile:
-    dataset: "rasterio.DatasetReader"
+    dataset: rasterio.DatasetReader
     info: FileInfo
 
 
 @dataclass
 class LastPlanData:
     """All arrays and metadata needed to generate a PDF report without re-planning."""
+
     lats: np.ndarray
     lons: np.ndarray
     final_alts: np.ndarray
@@ -54,14 +56,14 @@ class LastPlanData:
     route_hash: str
     mission_name: str
     zone_str: str
-    generated_at: str                        # ISO UTC timestamp
-    terrain_grid: np.ndarray | None          # (G, G) elevation MSL
-    terrain_grid_lons: np.ndarray | None     # (G,) longitude coords
-    terrain_grid_lats: np.ndarray | None     # (G,) latitude coords
+    generated_at: str  # ISO UTC timestamp
+    terrain_grid: np.ndarray | None  # (G, G) elevation MSL
+    terrain_grid_lons: np.ndarray | None  # (G,) longitude coords
+    terrain_grid_lats: np.ndarray | None  # (G,) latitude coords
     waypoints_list: list[dict] | None = None  # waypoint dicts (updated after altitude edits)
     no_terrain_mask: np.ndarray | None = None  # True where terrain data was NaN (skip safety check)
-    zip_bytes: bytes | None = None             # full plan ZIP for patching on altitude edit
-    poi_bands_list: list[dict] | None = None   # POI AGL band overrides for the altitude editor
+    zip_bytes: bytes | None = None  # full plan ZIP for patching on altitude edit
+    poi_bands_list: list[dict] | None = None  # POI AGL band overrides for the altitude editor
 
 
 @dataclass
@@ -100,7 +102,7 @@ def create_session() -> str:
     return session_id
 
 
-def store_file(session_id: str, name: str, dataset: "rasterio.DatasetReader", info: FileInfo) -> None:
+def store_file(session_id: str, name: str, dataset: rasterio.DatasetReader, info: FileInfo) -> None:
     """Add an open rasterio dataset to an existing session."""
     with _lock:
         if session_id not in _store:

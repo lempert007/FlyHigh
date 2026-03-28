@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
 from config import MISSIONS_ROOT
 from models import AppSettings
@@ -31,7 +31,9 @@ def load_settings() -> AppSettings:
         raw = json.loads(_SETTINGS_FILE.read_text(encoding="utf-8"))
         return AppSettings.model_validate(raw)
     except Exception:
-        logger.warning("settings.json could not be parsed — falling back to defaults", exc_info=True)
+        logger.warning(
+            "settings.json could not be parsed — falling back to defaults", exc_info=True
+        )
         return AppSettings()
 
 

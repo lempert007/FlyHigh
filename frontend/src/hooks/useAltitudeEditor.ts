@@ -25,9 +25,9 @@ import { fetchEditorData, fetchFolderEditorData } from "../api";
 
 export interface AltEditorData {
   wps: WpPoint[];
-  terrain: number[];       // terrain_elev[i] = wps[i].alt_m - aglProfile[i]
+  terrain: number[]; // terrain_elev[i] = wps[i].alt_m - aglProfile[i]
   cumDists: number[];
-  poiBands: PoiBand[];     // per-POI AGL band overrides (may be empty)
+  poiBands: PoiBand[]; // per-POI AGL band overrides (may be empty)
   waypointIndices?: number[]; // dense-array indices for user-placed waypoints
 }
 
@@ -62,12 +62,12 @@ export function useAltitudeEditor(
   folder: string | null,
   open: boolean,
   minAgl: number,
-  maxAgl: number,
+  maxAgl: number
 ): UseAltitudeEditorReturn {
-  const [loading, setLoading]         = useState(false);
-  const [loadError, setLoadError]     = useState<string | null>(null);
-  const [editorData, setEditorData]   = useState<AltEditorData | null>(null);
-  const [nodes, setNodes]             = useState<AltNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [editorData, setEditorData] = useState<AltEditorData | null>(null);
+  const [nodes, setNodes] = useState<AltNode[]>([]);
   const [insertCount, setInsertCount] = useState(0);
 
   // Load data from backend when modal opens
@@ -113,7 +113,9 @@ export function useAltitudeEditor(
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open, sessionId, folder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset editorData when session or folder changes so next open re-loads fresh
@@ -145,28 +147,18 @@ export function useAltitudeEditor(
   }, []);
 
   // Move two nodes in one setState call — avoids intermediate renders during segment drag
-  const dragTwoNodes = useCallback(
-    (idA: string, altA: number, idB: string, altB: number) => {
-      setNodes((prev) =>
-        prev.map((n) =>
-          n.id === idA ? { ...n, alt_m: altA }
-          : n.id === idB ? { ...n, alt_m: altB }
-          : n,
-        ),
-      );
-    },
-    [],
-  );
+  const dragTwoNodes = useCallback((idA: string, altA: number, idB: string, altB: number) => {
+    setNodes((prev) =>
+      prev.map((n) =>
+        n.id === idA ? { ...n, alt_m: altA } : n.id === idB ? { ...n, alt_m: altB } : n
+      )
+    );
+  }, []);
 
   const insertNode = useCallback(
     (dist_m: number) => {
       if (!editorData) return;
-      const alt = interpolateAltAtDist(
-        nodes,
-        editorData.wps,
-        editorData.cumDists,
-        dist_m,
-      );
+      const alt = interpolateAltAtDist(nodes, editorData.wps, editorData.cumDists, dist_m);
       const id = `inserted_${insertCount}`;
       setInsertCount((c) => c + 1);
       setNodes((prev) => {
@@ -177,7 +169,7 @@ export function useAltitudeEditor(
         return next.sort((a, b) => a.dist_m - b.dist_m);
       });
     },
-    [editorData, nodes, insertCount],
+    [editorData, nodes, insertCount]
   );
 
   const removeNode = useCallback((id: string) => {
@@ -186,7 +178,11 @@ export function useAltitudeEditor(
 
   const reset = useCallback(() => {
     if (!editorData) return;
-    const initialNodes = buildNodes(editorData.wps, editorData.cumDists, editorData.waypointIndices);
+    const initialNodes = buildNodes(
+      editorData.wps,
+      editorData.cumDists,
+      editorData.waypointIndices
+    );
     setNodes(initialNodes);
     setInsertCount(0);
   }, [editorData]);

@@ -7,10 +7,10 @@ import type { PlanStep } from "../../hooks/usePlanRoute";
 const PHASE_ORDER: PlanStep["phase"][] = ["terrain", "route", "altitude", "safety", "packaging"];
 
 const PHASE_META: Record<PlanStep["phase"], { color: string; icon: string }> = {
-  terrain:   { color: "#4fc3f7", icon: "◈" },
-  route:     { color: "#81c784", icon: "⬡" },
-  altitude:  { color: "#ffb74d", icon: "▲" },
-  safety:    { color: "#f06292", icon: "◉" },
+  terrain: { color: "#4fc3f7", icon: "◈" },
+  route: { color: "#81c784", icon: "⬡" },
+  altitude: { color: "#ffb74d", icon: "▲" },
+  safety: { color: "#f06292", icon: "◉" },
   packaging: { color: "#ce93d8", icon: "◎" },
 };
 
@@ -65,7 +65,8 @@ export function PlanningProgress({ step, completed = false }: Props) {
           content: '""',
           position: "absolute",
           inset: 0,
-          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 4px)",
+          backgroundImage:
+            "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.012) 2px, rgba(255,255,255,0.012) 4px)",
           pointerEvents: "none",
           zIndex: 0,
         },
@@ -124,14 +125,22 @@ export function PlanningProgress({ step, completed = false }: Props) {
                   transition: "color 0.4s",
                 }}
               >
-                {completed ? "Route ready" : (PLAN_STEPS[currentStep]?.phaseLabel ?? "Initializing")}
+                {completed
+                  ? "Route ready"
+                  : (PLAN_STEPS[currentStep]?.phaseLabel ?? "Initializing")}
               </Typography>
             </Box>
           </Stack>
 
           {/* Elapsed + step counter */}
           <Stack alignItems="flex-end" spacing={0.25}>
-            <Typography sx={{ fontSize: "0.7rem", color: completed ? "#00e676" : "#4a5568", fontFamily: "monospace" }}>
+            <Typography
+              sx={{
+                fontSize: "0.7rem",
+                color: completed ? "#00e676" : "#4a5568",
+                fontFamily: "monospace",
+              }}
+            >
               {completed ? "done" : `${elapsed.toFixed(1)}s`}
             </Typography>
             <Typography sx={{ fontSize: "0.6rem", color: "#2d3748", fontFamily: "monospace" }}>
@@ -144,7 +153,15 @@ export function PlanningProgress({ step, completed = false }: Props) {
       {/* ── Drone + progress bar ── */}
       <Box sx={{ position: "relative", zIndex: 1, px: 2, pt: 1.5, pb: 1 }}>
         {/* Track */}
-        <Box sx={{ position: "relative", height: 6, bgcolor: "#1c2128", borderRadius: 3, overflow: "visible" }}>
+        <Box
+          sx={{
+            position: "relative",
+            height: 6,
+            bgcolor: "#1c2128",
+            borderRadius: 3,
+            overflow: "visible",
+          }}
+        >
           {/* Fill */}
           <Box
             sx={{
@@ -226,8 +243,7 @@ export function PlanningProgress({ step, completed = false }: Props) {
           const meta = PHASE_META[s.phase];
           // Timestamp approximation based on STEP_DELAYS
           const STEP_DELAYS_LOCAL = [
-            0, 350, 750, 1200, 1800, 2500, 3300,
-            4200, 5000, 5700, 6300, 6900, 7500, 8200, 8900,
+            0, 350, 750, 1200, 1800, 2500, 3300, 4200, 5000, 5700, 6300, 6900, 7500, 8200, 8900,
             9500, 10000, 10500, 11000, 11400, 11800,
           ];
           const ts = (STEP_DELAYS_LOCAL[i] / 1000).toFixed(1);
@@ -243,7 +259,7 @@ export function PlanningProgress({ step, completed = false }: Props) {
                 animation: "lineIn 0.25s ease-out both",
                 "@keyframes lineIn": {
                   from: { opacity: 0, transform: "translateX(-6px)" },
-                  to:   { opacity: 1, transform: "translateX(0)" },
+                  to: { opacity: 1, transform: "translateX(0)" },
                 },
               }}
             >

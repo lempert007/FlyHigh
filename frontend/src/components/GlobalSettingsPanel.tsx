@@ -30,9 +30,15 @@ interface PresetRow extends PresetItem {
 }
 
 let _rowCounter = 0;
-function makeKey() { return `row-${++_rowCounter}`; }
-function toRows(presets: PresetItem[]): PresetRow[] { return presets.map((p) => ({ ...p, _key: makeKey() })); }
-function toItems(rows: PresetRow[]): PresetItem[] { return rows.map(({ _key: _k, ...rest }) => rest); }
+function makeKey() {
+  return `row-${++_rowCounter}`;
+}
+function toRows(presets: PresetItem[]): PresetRow[] {
+  return presets.map((p) => ({ ...p, _key: makeKey() }));
+}
+function toItems(rows: PresetRow[]): PresetItem[] {
+  return rows.map(({ _key: _k, ...rest }) => rest);
+}
 
 function validateRows(rows: PresetRow[]): string | null {
   if (rows.length === 0) return "At least one preset is required.";
@@ -51,17 +57,29 @@ function validateRows(rows: PresetRow[]): string | null {
 // ── Shared field component ────────────────────────────────────────────────────
 
 function NumField({
-  value, unit, onChange, min = 0, step = "any", width = 120,
+  value,
+  unit,
+  onChange,
+  min = 0,
+  step = "any",
+  width = 120,
 }: {
-  value: number; unit: string; onChange: (v: number) => void;
-  min?: number; step?: string; width?: number;
+  value: number;
+  unit: string;
+  onChange: (v: number) => void;
+  min?: number;
+  step?: string;
+  width?: number;
 }) {
   return (
     <TextField
       size="small"
       type="number"
       value={value}
-      onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(n); }}
+      onChange={(e) => {
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onChange(n);
+      }}
       inputProps={{ min, step }}
       InputProps={{
         endAdornment: (
@@ -87,7 +105,15 @@ function NumField({
 
 // ── Setting row (label + description on left, control on right) ───────────────
 
-function SettingRow({ label, desc, children }: { label: string; desc?: string; children: React.ReactNode }) {
+function SettingRow({
+  label,
+  desc,
+  children,
+}: {
+  label: string;
+  desc?: string;
+  children: React.ReactNode;
+}) {
   return (
     <Box
       sx={{
@@ -101,7 +127,9 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
       }}
     >
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography sx={{ fontSize: "0.82rem", color: "#cdd9e5", fontWeight: 500, lineHeight: 1.3 }}>
+        <Typography
+          sx={{ fontSize: "0.82rem", color: "#cdd9e5", fontWeight: 500, lineHeight: 1.3 }}
+        >
           {label}
         </Typography>
         {desc && (
@@ -118,15 +146,26 @@ function SettingRow({ label, desc, children }: { label: string; desc?: string; c
 // ── Preset row editor ─────────────────────────────────────────────────────────
 
 function PresetNumField({
-  label, unit, value, onChange,
-}: { label: string; unit: string; value: number; onChange: (v: number) => void }) {
+  label,
+  unit,
+  value,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: number;
+  onChange: (v: number) => void;
+}) {
   return (
     <TextField
       label={label}
       size="small"
       type="number"
       value={value}
-      onChange={(e) => { const n = parseFloat(e.target.value); if (!isNaN(n)) onChange(n); }}
+      onChange={(e) => {
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onChange(n);
+      }}
       inputProps={{ min: 0, step: "any" }}
       InputProps={{
         endAdornment: (
@@ -154,13 +193,31 @@ function PresetNumField({
 }
 
 function PresetRowEditor({
-  row, isOnly, onChange, onDelete,
-}: { row: PresetRow; isOnly: boolean; onChange: (u: PresetRow) => void; onDelete: () => void }) {
+  row,
+  isOnly,
+  onChange,
+  onDelete,
+}: {
+  row: PresetRow;
+  isOnly: boolean;
+  onChange: (u: PresetRow) => void;
+  onDelete: () => void;
+}) {
   function field<K extends keyof PresetRow>(key: K) {
     return (val: PresetRow[K]) => onChange({ ...row, [key]: val });
   }
   return (
-    <Box sx={{ bgcolor: "#161b22", border: "1px solid #30363d", borderRadius: 1.5, p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
+    <Box
+      sx={{
+        bgcolor: "#161b22",
+        border: "1px solid #30363d",
+        borderRadius: 1.5,
+        p: 1.5,
+        display: "flex",
+        flexDirection: "column",
+        gap: 1.5,
+      }}
+    >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
         <TextField
           placeholder="Preset name"
@@ -183,8 +240,14 @@ function PresetRowEditor({
         <Tooltip title={isOnly ? "Cannot delete the last preset" : "Delete preset"}>
           <span>
             <IconButton
-              size="small" onClick={onDelete} disabled={isOnly}
-              sx={{ color: "#f85149", opacity: isOnly ? 0.3 : 1, "&:hover": { bgcolor: "rgba(248,81,73,0.08)" } }}
+              size="small"
+              onClick={onDelete}
+              disabled={isOnly}
+              sx={{
+                color: "#f85149",
+                opacity: isOnly ? 0.3 : 1,
+                "&:hover": { bgcolor: "rgba(248,81,73,0.08)" },
+              }}
             >
               <DeleteOutlineIcon sx={{ fontSize: 16 }} />
             </IconButton>
@@ -192,10 +255,30 @@ function PresetRowEditor({
         </Tooltip>
       </Box>
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
-        <PresetNumField label="Cruise speed" unit="m/s" value={row.cruise_speed_ms} onChange={field("cruise_speed_ms")} />
-        <PresetNumField label="Climb rate"   unit="m/s" value={row.climb_rate_ms}   onChange={field("climb_rate_ms")} />
-        <PresetNumField label="Battery"      unit="Wh"  value={row.battery_wh}       onChange={field("battery_wh")} />
-        <PresetNumField label="Drone weight" unit="kg"  value={row.drone_weight_kg}  onChange={field("drone_weight_kg")} />
+        <PresetNumField
+          label="Cruise speed"
+          unit="m/s"
+          value={row.cruise_speed_ms}
+          onChange={field("cruise_speed_ms")}
+        />
+        <PresetNumField
+          label="Climb rate"
+          unit="m/s"
+          value={row.climb_rate_ms}
+          onChange={field("climb_rate_ms")}
+        />
+        <PresetNumField
+          label="Battery"
+          unit="Wh"
+          value={row.battery_wh}
+          onChange={field("battery_wh")}
+        />
+        <PresetNumField
+          label="Drone weight"
+          unit="kg"
+          value={row.drone_weight_kg}
+          onChange={field("drone_weight_kg")}
+        />
       </Box>
     </Box>
   );
@@ -253,7 +336,9 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
     setError(null);
     try {
       const [presets, customised, appSettings] = await Promise.all([
-        getPresets(), isPresetsCustomised(), getSettings(),
+        getPresets(),
+        isPresetsCustomised(),
+        getSettings(),
       ]);
       setRows(toRows(presets));
       setIsCustomised(customised);
@@ -265,7 +350,12 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
     }
   }, []);
 
-  useEffect(() => { if (open) { setTab(0); loadAll(); } }, [open, loadAll]);
+  useEffect(() => {
+    if (open) {
+      setTab(0);
+      loadAll();
+    }
+  }, [open, loadAll]);
 
   function handleRowChange(key: string, updated: PresetRow) {
     setRows((prev) => prev.map((r) => (r._key === key ? updated : r)));
@@ -278,7 +368,17 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
   }
 
   function handleAdd() {
-    setRows((prev) => [...prev, { _key: makeKey(), name: "New Preset", cruise_speed_ms: 10, climb_rate_ms: 3, battery_wh: 500, drone_weight_kg: 2.0 }]);
+    setRows((prev) => [
+      ...prev,
+      {
+        _key: makeKey(),
+        name: "New Preset",
+        cruise_speed_ms: 10,
+        climb_rate_ms: 3,
+        battery_wh: 500,
+        drone_weight_kg: 2.0,
+      },
+    ]);
   }
 
   function setSetting<K extends keyof AppSettings>(key: K, val: AppSettings[K]) {
@@ -287,9 +387,14 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
   }
 
   async function handleSave() {
-    if (tab === 2 || true) { // validate all tabs on save
+    {
+      // validate all tabs on save
       const err = validateRows(rows);
-      if (err) { setTab(2); setValidationError(err); return; }
+      if (err) {
+        setTab(2);
+        setValidationError(err);
+        return;
+      }
     }
     if (settings.default_min_agl_m >= settings.default_max_agl_m) {
       setTab(0);
@@ -344,17 +449,38 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
           flexShrink: 0,
         }}
       >
-        <Typography sx={{ flex: 1, fontSize: "0.88rem", fontWeight: 700, color: "#cdd9e5", letterSpacing: "0.01em" }}>
+        <Typography
+          sx={{
+            flex: 1,
+            fontSize: "0.88rem",
+            fontWeight: 700,
+            color: "#cdd9e5",
+            letterSpacing: "0.01em",
+          }}
+        >
           Settings
         </Typography>
-        <IconButton size="small" onClick={onClose} disabled={saving} sx={{ color: "#6e7681", "&:hover": { color: "#cdd9e5" } }}>
+        <IconButton
+          size="small"
+          onClick={onClose}
+          disabled={saving}
+          sx={{ color: "#6e7681", "&:hover": { color: "#cdd9e5" } }}
+        >
           <CloseIcon sx={{ fontSize: 16 }} />
         </IconButton>
       </DialogTitle>
 
       {/* Tab bar */}
       <Box sx={{ borderBottom: "1px solid #21262d", bgcolor: "#0f1318", flexShrink: 0 }}>
-        <Tabs value={tab} onChange={(_, v: number) => { setTab(v); setValidationError(null); }} variant="fullWidth" sx={TAB_SX}>
+        <Tabs
+          value={tab}
+          onChange={(_, v: number) => {
+            setTab(v);
+            setValidationError(null);
+          }}
+          variant="fullWidth"
+          sx={TAB_SX}
+        >
           <Tab label="Defaults" />
           <Tab label="Warnings" />
           <Tab label="Presets" />
@@ -362,17 +488,39 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
       </Box>
 
       {/* Content */}
-      <DialogContent sx={{ p: 0, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <DialogContent
+        sx={{ p: 0, flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}
+      >
         {/* Errors */}
         {(error || validationError) && (
           <Box sx={{ px: 2.5, pt: 2, flexShrink: 0 }}>
             {error && (
-              <Alert severity="error" sx={{ mb: 1, bgcolor: "rgba(248,81,73,0.08)", border: "1px solid rgba(248,81,73,0.25)", color: "#f85149", fontSize: "0.78rem", "& .MuiAlert-icon": { color: "#f85149" } }}>
+              <Alert
+                severity="error"
+                sx={{
+                  mb: 1,
+                  bgcolor: "rgba(248,81,73,0.08)",
+                  border: "1px solid rgba(248,81,73,0.25)",
+                  color: "#f85149",
+                  fontSize: "0.78rem",
+                  "& .MuiAlert-icon": { color: "#f85149" },
+                }}
+              >
                 {error}
               </Alert>
             )}
             {validationError && (
-              <Alert severity="warning" sx={{ mb: 1, bgcolor: "rgba(210,153,34,0.08)", border: "1px solid rgba(210,153,34,0.25)", color: "#e3b341", fontSize: "0.78rem", "& .MuiAlert-icon": { color: "#e3b341" } }}>
+              <Alert
+                severity="warning"
+                sx={{
+                  mb: 1,
+                  bgcolor: "rgba(210,153,34,0.08)",
+                  border: "1px solid rgba(210,153,34,0.25)",
+                  color: "#e3b341",
+                  fontSize: "0.78rem",
+                  "& .MuiAlert-icon": { color: "#e3b341" },
+                }}
+              >
                 {validationError}
               </Alert>
             )}
@@ -385,19 +533,42 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
           </Box>
         ) : (
           <Box sx={{ flex: 1, overflowY: "auto", px: 2.5, pt: 1, pb: 2 }}>
-
             {/* ── Tab 0: Mission Defaults ── */}
             {tab === 0 && (
               <Box>
                 <Box sx={{ mt: 1.5 }}>
-                  <SettingRow label="Min altitude (AGL)" desc="Lowest the drone will fly above ground">
-                    <NumField value={settings.default_min_agl_m} unit="m" min={1} onChange={(v) => setSetting("default_min_agl_m", v)} />
+                  <SettingRow
+                    label="Min altitude (AGL)"
+                    desc="Lowest the drone will fly above ground"
+                  >
+                    <NumField
+                      value={settings.default_min_agl_m}
+                      unit="m"
+                      min={1}
+                      onChange={(v) => setSetting("default_min_agl_m", v)}
+                    />
                   </SettingRow>
-                  <SettingRow label="Max altitude (AGL)" desc="Highest the drone will fly above ground">
-                    <NumField value={settings.default_max_agl_m} unit="m" min={1} onChange={(v) => setSetting("default_max_agl_m", v)} />
+                  <SettingRow
+                    label="Max altitude (AGL)"
+                    desc="Highest the drone will fly above ground"
+                  >
+                    <NumField
+                      value={settings.default_max_agl_m}
+                      unit="m"
+                      min={1}
+                      onChange={(v) => setSetting("default_max_agl_m", v)}
+                    />
                   </SettingRow>
-                  <SettingRow label="Route point spacing" desc="Distance between computed route waypoints">
-                    <NumField value={settings.default_spacing_m} unit="m" min={1} onChange={(v) => setSetting("default_spacing_m", v)} />
+                  <SettingRow
+                    label="Route point spacing"
+                    desc="Distance between computed route waypoints"
+                  >
+                    <NumField
+                      value={settings.default_spacing_m}
+                      unit="m"
+                      min={1}
+                      onChange={(v) => setSetting("default_spacing_m", v)}
+                    />
                   </SettingRow>
                 </Box>
               </Box>
@@ -407,11 +578,26 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
             {tab === 1 && (
               <Box>
                 <Box sx={{ mt: 1.5 }}>
-                  <SettingRow label="Battery warning" desc="Budget % that triggers an amber warning">
-                    <NumField value={settings.battery_warning_pct} unit="%" min={0} step="1" onChange={(v) => setSetting("battery_warning_pct", v)} />
+                  <SettingRow
+                    label="Battery warning"
+                    desc="Budget % that triggers an amber warning"
+                  >
+                    <NumField
+                      value={settings.battery_warning_pct}
+                      unit="%"
+                      min={0}
+                      step="1"
+                      onChange={(v) => setSetting("battery_warning_pct", v)}
+                    />
                   </SettingRow>
                   <SettingRow label="Battery error" desc="Budget % that triggers a red error">
-                    <NumField value={settings.battery_error_pct} unit="%" min={0} step="1" onChange={(v) => setSetting("battery_error_pct", v)} />
+                    <NumField
+                      value={settings.battery_error_pct}
+                      unit="%"
+                      min={0}
+                      step="1"
+                      onChange={(v) => setSetting("battery_error_pct", v)}
+                    />
                   </SettingRow>
                 </Box>
               </Box>
@@ -423,7 +609,14 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
                 {!isCustomised && (
                   <Alert
                     severity="info"
-                    sx={{ mb: 2, bgcolor: "rgba(30,144,255,0.06)", border: "1px solid rgba(30,144,255,0.18)", color: "#8b949e", fontSize: "0.75rem", "& .MuiAlert-icon": { color: "#1E90FF", fontSize: 16 } }}
+                    sx={{
+                      mb: 2,
+                      bgcolor: "rgba(30,144,255,0.06)",
+                      border: "1px solid rgba(30,144,255,0.18)",
+                      color: "#8b949e",
+                      fontSize: "0.75rem",
+                      "& .MuiAlert-icon": { color: "#1E90FF", fontSize: 16 },
+                    }}
                   >
                     Using built-in defaults — saving will create a custom preset library.
                   </Alert>
@@ -450,7 +643,11 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
                       border: "1px dashed #21262d",
                       borderRadius: 1.5,
                       py: 1,
-                      "&:hover": { borderColor: "#444c56", color: "#cdd9e5", bgcolor: "rgba(255,255,255,0.02)" },
+                      "&:hover": {
+                        borderColor: "#444c56",
+                        color: "#cdd9e5",
+                        bgcolor: "rgba(255,255,255,0.02)",
+                      },
                     }}
                   >
                     Add preset
@@ -458,18 +655,31 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
                 </Box>
               </Box>
             )}
-
           </Box>
         )}
       </DialogContent>
 
       {/* Footer */}
-      <DialogActions sx={{ px: 2.5, py: 1.75, gap: 1, bgcolor: "#161b22", borderTop: "1px solid #21262d", flexShrink: 0 }}>
+      <DialogActions
+        sx={{
+          px: 2.5,
+          py: 1.75,
+          gap: 1,
+          bgcolor: "#161b22",
+          borderTop: "1px solid #21262d",
+          flexShrink: 0,
+        }}
+      >
         <Button
           onClick={onClose}
           disabled={saving}
           size="small"
-          sx={{ textTransform: "none", fontSize: "0.8rem", color: "#6e7681", "&:hover": { color: "#cdd9e5" } }}
+          sx={{
+            textTransform: "none",
+            fontSize: "0.8rem",
+            color: "#6e7681",
+            "&:hover": { color: "#cdd9e5" },
+          }}
         >
           Cancel
         </Button>
@@ -479,7 +689,13 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
           onClick={handleSave}
           disabled={saving || loading}
           startIcon={saving ? <CircularProgress size={11} color="inherit" /> : undefined}
-          sx={{ textTransform: "none", fontSize: "0.8rem", fontWeight: 600, boxShadow: "none", "&:hover": { boxShadow: "0 0 10px rgba(30,144,255,0.3)" } }}
+          sx={{
+            textTransform: "none",
+            fontSize: "0.8rem",
+            fontWeight: 600,
+            boxShadow: "none",
+            "&:hover": { boxShadow: "0 0 10px rgba(30,144,255,0.3)" },
+          }}
         >
           {saving ? "Saving…" : "Save"}
         </Button>

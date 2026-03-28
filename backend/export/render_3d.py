@@ -8,7 +8,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 import config
-from core.utm_utils import utm_to_latlon
 from core.terrain import TerrainIndex
 
 
@@ -53,49 +52,57 @@ def render_3d_html(
     elev_surface = np.where(np.isnan(elev_surface), fill_val, elev_surface)
 
     # Terrain surface
-    fig.add_trace(go.Surface(
-        x=EE,
-        y=NN,
-        z=elev_surface,
-        colorscale="earth",
-        opacity=0.85,
-        showscale=True,
-        colorbar=dict(title="Elev (m)", x=0.0),
-        name="Terrain (DSM)",
-        hovertemplate="E: %{x:.0f} m<br>N: %{y:.0f} m<br>Elev: %{z:.1f} m<extra>DSM</extra>",
-    ))
+    fig.add_trace(
+        go.Surface(
+            x=EE,
+            y=NN,
+            z=elev_surface,
+            colorscale="earth",
+            opacity=0.85,
+            showscale=True,
+            colorbar=dict(title="Elev (m)", x=0.0),
+            name="Terrain (DSM)",
+            hovertemplate="E: %{x:.0f} m<br>N: %{y:.0f} m<br>Elev: %{z:.1f} m<extra>DSM</extra>",
+        )
+    )
 
     # Flight path
-    fig.add_trace(go.Scatter3d(
-        x=utm_points[:, 0],
-        y=utm_points[:, 1],
-        z=altitudes,
-        mode="lines",
-        line=dict(color="royalblue", width=4),
-        name="Flight path",
-    ))
+    fig.add_trace(
+        go.Scatter3d(
+            x=utm_points[:, 0],
+            y=utm_points[:, 1],
+            z=altitudes,
+            mode="lines",
+            line=dict(color="royalblue", width=4),
+            name="Flight path",
+        )
+    )
 
     # Start marker
-    fig.add_trace(go.Scatter3d(
-        x=[utm_points[0, 0]],
-        y=[utm_points[0, 1]],
-        z=[altitudes[0]],
-        mode="markers",
-        marker=dict(size=8, color="limegreen", symbol="diamond"),
-        name="Start",
-    ))
+    fig.add_trace(
+        go.Scatter3d(
+            x=[utm_points[0, 0]],
+            y=[utm_points[0, 1]],
+            z=[altitudes[0]],
+            mode="markers",
+            marker=dict(size=8, color="limegreen", symbol="diamond"),
+            name="Start",
+        )
+    )
 
     # POI markers
     if poi_indices:
         for idx in poi_indices:
-            fig.add_trace(go.Scatter3d(
-                x=[utm_points[idx, 0]],
-                y=[utm_points[idx, 1]],
-                z=[altitudes[idx]],
-                mode="markers",
-                marker=dict(size=8, color="red", symbol="circle"),
-                name=f"POI @ pt {idx}",
-            ))
+            fig.add_trace(
+                go.Scatter3d(
+                    x=[utm_points[idx, 0]],
+                    y=[utm_points[idx, 1]],
+                    z=[altitudes[idx]],
+                    mode="markers",
+                    marker=dict(size=8, color="red", symbol="circle"),
+                    name=f"POI @ pt {idx}",
+                )
+            )
 
     fig.update_layout(
         title="FlyHigh — 3D Route",

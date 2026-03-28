@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo } from "react";
 import { Marker, Polyline, useMap } from "react-leaflet";
-import type { LatLon, UploadResult } from "../../types/mission";
+import type { UploadResult } from "../../types/mission";
 import type { FlightPreviewState } from "../../hooks/useFlightPreview";
 import { makeDroneIcon } from "./icons";
 
@@ -29,7 +29,7 @@ export function FitOnUpload({ uploadResult }: FitOnUploadProps) {
       [f.bbox[3], f.bbox[2]],
     ]);
     map.fitBounds(corners, { padding: [40, 40], animate: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uploadResult]);
   return null;
 }
@@ -38,7 +38,7 @@ export function FitOnUpload({ uploadResult }: FitOnUploadProps) {
 
 function splitRouteAtProgress(
   points: [number, number][],
-  progress: number,
+  progress: number
 ): { flown: [number, number][]; unflown: [number, number][] } {
   if (points.length < 2 || progress <= 0) return { flown: [], unflown: points };
   if (progress >= 1) return { flown: points, unflown: [] };
@@ -75,10 +75,23 @@ interface MapRouteProps {
   flightPreview?: FlightPreviewState;
 }
 
-export function MapRoute({ routeLeaflet, allLatLons, routeAglProfile, minAglM, flightPreview }: MapRouteProps) {
+export function MapRoute({
+  routeLeaflet,
+  allLatLons,
+  routeAglProfile,
+  minAglM,
+  flightPreview,
+}: MapRouteProps) {
   const coloredSegments = useMemo(() => {
-    if (!routeAglProfile || !minAglM || routeAglProfile.length !== routeLeaflet.length || routeLeaflet.length < 2) return null;
-    const color = (agl: number) => (agl < minAglM ? "#ff5252" : agl < minAglM * 1.2 ? "#ff9100" : "#00e676");
+    if (
+      !routeAglProfile ||
+      !minAglM ||
+      routeAglProfile.length !== routeLeaflet.length ||
+      routeLeaflet.length < 2
+    )
+      return null;
+    const color = (agl: number) =>
+      agl < minAglM ? "#ff5252" : agl < minAglM * 1.2 ? "#ff9100" : "#00e676";
     const segs: { positions: [number, number][]; color: string }[] = [];
     let run: [number, number][] = [routeLeaflet[0]];
     let runColor = color(routeAglProfile[0]);
@@ -100,23 +113,38 @@ export function MapRoute({ routeLeaflet, allLatLons, routeAglProfile, minAglM, f
   return (
     <>
       {/* Route lines */}
-      {routeLeaflet.length > 1 && (() => {
-        if (flightPreview?.isActive) {
-          const { flown, unflown } = splitRouteAtProgress(routeLeaflet, flightPreview.progress);
-          return (
-            <>
-              {unflown.length > 1 && <Polyline positions={unflown} color="#FF7043" weight={2.5} opacity={0.45} />}
-              {flown.length > 1 && <Polyline positions={flown} color="#00E5FF" weight={3} opacity={0.95} />}
-            </>
-          );
-        }
-        if (coloredSegments) {
-          return <>{coloredSegments.map((seg, i) => (
-            <Polyline key={i} positions={seg.positions} color={seg.color} weight={2.5} opacity={0.85} />
-          ))}</>;
-        }
-        return <Polyline positions={routeLeaflet} color="#FF7043" weight={2.5} opacity={0.85} />;
-      })()}
+      {routeLeaflet.length > 1 &&
+        (() => {
+          if (flightPreview?.isActive) {
+            const { flown, unflown } = splitRouteAtProgress(routeLeaflet, flightPreview.progress);
+            return (
+              <>
+                {unflown.length > 1 && (
+                  <Polyline positions={unflown} color="#FF7043" weight={2.5} opacity={0.45} />
+                )}
+                {flown.length > 1 && (
+                  <Polyline positions={flown} color="#00E5FF" weight={3} opacity={0.95} />
+                )}
+              </>
+            );
+          }
+          if (coloredSegments) {
+            return (
+              <>
+                {coloredSegments.map((seg, i) => (
+                  <Polyline
+                    key={i}
+                    positions={seg.positions}
+                    color={seg.color}
+                    weight={2.5}
+                    opacity={0.85}
+                  />
+                ))}
+              </>
+            );
+          }
+          return <Polyline positions={routeLeaflet} color="#FF7043" weight={2.5} opacity={0.85} />;
+        })()}
 
       {/* Dashed preview line when no route planned yet */}
       {routeLeaflet.length === 0 && allLatLons.length > 1 && (
@@ -124,16 +152,18 @@ export function MapRoute({ routeLeaflet, allLatLons, routeAglProfile, minAglM, f
       )}
 
       {/* Drone marker during flight preview */}
-      {flightPreview?.isActive && flightPreview.dronePosition && (() => {
-        const bearingRounded = Math.round(flightPreview.droneBearing / 4) * 4;
-        return (
-          <Marker
-            position={[flightPreview.dronePosition.lat, flightPreview.dronePosition.lon]}
-            icon={makeDroneIcon(bearingRounded)}
-            zIndexOffset={1000}
-          />
-        );
-      })()}
+      {flightPreview?.isActive &&
+        flightPreview.dronePosition &&
+        (() => {
+          const bearingRounded = Math.round(flightPreview.droneBearing / 4) * 4;
+          return (
+            <Marker
+              position={[flightPreview.dronePosition.lat, flightPreview.dronePosition.lon]}
+              icon={makeDroneIcon(bearingRounded)}
+              zIndexOffset={1000}
+            />
+          );
+        })()}
     </>
   );
 }

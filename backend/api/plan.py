@@ -17,7 +17,7 @@ import io
 import json
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import numpy as np
 import utm as _utm_lib
@@ -27,7 +27,6 @@ from scipy.spatial import KDTree
 
 import config
 import session as session_store
-from session import LastPlanData, store_plan_data
 from core.battery import cumulative_energy_wh
 from core.poi import (
     build_poi_zone,
@@ -42,8 +41,7 @@ from core.route import (
     detect_mission_zone,
     plan_route,
 )
-from core.utm_utils import haversine_m, latlon_to_utm, utm_to_latlon
-from core.terrain import build_terrain_index, TerrainIndex
+from core.terrain import TerrainIndex, build_terrain_index
 from core.types import (
     AltitudeBand,
     FlightParams,
@@ -53,20 +51,22 @@ from core.types import (
     Violation,
     ViolationTier,
 )
+from core.utm_utils import haversine_m, utm_to_latlon
+from session import LastPlanData, store_plan_data
 
 # Actions that indicate a dense waypoint is inside a POI scan area
 _POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft"})
+from api.settings import load_settings
 from export.mission_log import generate_mission_log
 from export.packager import build_zip, strip_internal_files
-from export.render_kml import render_kml
 from export.render_3d import render_3d_html
 from export.render_combined import render_combined_html
+from export.render_kml import render_kml
 from export.render_map import render_map_html
-from export.render_smart_route_diff import render_smart_route_diff_html
 from export.render_profile import render_profile_html
+from export.render_smart_route_diff import render_smart_route_diff_html
 from export.waypoints import serialise_waypoints_json, to_waypoints_json
 from models import PlanMeta, POIConfig, RouteRequest, ViolationInfo
-from api.settings import load_settings
 
 logger = logging.getLogger(__name__)
 
@@ -83,13 +83,17 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
     """Compute an optimised terrain-following route and return a ZIP file."""
     logger.info(
         "Planning route: %d POIs, %d waypoints, smart_route=%s",
-        len(req.pois), len(req.waypoints), req.config.smart_route,
+        len(req.pois),
+        len(req.waypoints),
+        req.config.smart_route,
     )
 
     # ── 1. Load session ────────────────────────────────────────────────────────
     sess = session_store.get_session(req.session_id)
     if sess is None:
-        raise HTTPException(status_code=404, detail=f"Session {req.session_id!r} not found or expired")
+        raise HTTPException(
+            status_code=404, detail=f"Session {req.session_id!r} not found or expired"
+        )
     if not sess.files:
         raise HTTPException(status_code=400, detail="Session contains no uploaded terrain files")
 
@@ -113,7 +117,9 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         zone_str = dtm_index.zone_str
 
         # ── 4. Validate mission zone ───────────────────────────────────────────
-        all_latlon_points = [req.start] + req.waypoints + [poi.point for poi in req.pois] + [req.landing]
+        all_latlon_points = (
+            [req.start] + req.waypoints + [poi.point for poi in req.pois] + [req.landing]
+        )
         try:
             detect_mission_zone(all_latlon_points)
         except ValueError as exc:
@@ -161,7 +167,11 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             poi_center = LatLon(lat=poi.point.lat, lon=poi.point.lon)
             entry_bearing = compute_entry_bearing(prev_point, poi_center)
             pattern = _expand_maneuver_latlon(
-                poi, zone_str, entry_bearing, dtm_index, params,
+                poi,
+                zone_str,
+                entry_bearing,
+                dtm_index,
+                params,
                 prev_point=prev_point,
             )
             if not pattern:
@@ -251,10 +261,12 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         if result.violations:
             if kd_tree is not None:
                 # Batch-convert all violation locations in one vectorized pass
-                viol_locs = np.array([
-                    _utm_lib.from_latlon(v.location.lat, v.location.lon)[:2]
-                    for v in result.violations
-                ])
+                viol_locs = np.array(
+                    [
+                        _utm_lib.from_latlon(v.location.lat, v.location.lon)[:2]
+                        for v in result.violations
+                    ]
+                )
                 _, nearest_indices = kd_tree.query(viol_locs)
                 point_indices = nearest_indices.tolist()
             else:
@@ -329,7 +341,10 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
 
         # ── 14. Waypoints JSON ────────────────────────────────────────────────
         waypoints_json = to_waypoints_json(
-            dense_utm, final_alts, headings, zone_str,
+            dense_utm,
+            final_alts,
+            headings,
+            zone_str,
             speed_ms=fc.cruise_speed_ms,
             actions=dense_actions,
         )
@@ -357,7 +372,10 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
 
         # ── 17. Render map ─────────────────────────────────────────────────────
         map_html = render_map_html(
-            dense_utm, final_alts, zone_str, fc,
+            dense_utm,
+            final_alts,
+            zone_str,
+            fc,
             start_index=0,
             waypoint_indices=waypoint_indices,
             poi_indices=poi_indices,
@@ -368,7 +386,10 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
 
         # ── 18. Render 3-D view ────────────────────────────────────────────────
         chart_3d = render_3d_html(
-            dense_utm, final_alts, dsm_index, zone_str,
+            dense_utm,
+            final_alts,
+            dsm_index,
+            zone_str,
             poi_indices=poi_indices,
         )
 
@@ -377,14 +398,20 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         return_home_dist = (
             float(cum_dists[poi_end_indices[-1]])
             if poi_end_indices
-            else float(cum_dists[landing_index]) if landing_index < n_dense else total_dist_m
+            else float(cum_dists[landing_index])
+            if landing_index < n_dense
+            else total_dist_m
         )
 
         # ── 20. Cumulative energy for profile ─────────────────────────────────
         cum_energy = cumulative_energy_wh(dense_utm, final_alts, params)
 
         profile_html = render_profile_html(
-            dense_utm, final_alts, terrain_elevs, cum_dists, fc,
+            dense_utm,
+            final_alts,
+            terrain_elevs,
+            cum_dists,
+            fc,
             poi_distances=poi_distances or None,
             return_home_distance=return_home_dist,
             poi_band_overrides=poi_band_overrides or None,
@@ -407,7 +434,9 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             )
 
         # ── 22. Combined report ────────────────────────────────────────────────
-        combined_html = render_combined_html(map_html, chart_3d, profile_html, smart_route_diff_html)
+        combined_html = render_combined_html(
+            map_html, chart_3d, profile_html, smart_route_diff_html
+        )
 
         # ── 23. Mission log ────────────────────────────────────────────────────
         route_hash = hashlib.sha256(
@@ -431,24 +460,31 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
 
         logger.info(
             "Route complete: %.0f m, %.0f s, %.1f Wh (%.0f%% battery)",
-            total_dist_m, flight_time_s, energy_wh, budget_pct,
+            total_dist_m,
+            flight_time_s,
+            energy_wh,
+            budget_pct,
         )
 
         # ── 23. Package ZIP ────────────────────────────────────────────────────
         kml_str = render_kml(waypoints_json)
         poi_bands_json_str: str | None = None
         if poi_band_overrides:
-            poi_bands_json_str = json.dumps([
-                {"start_m": s, "end_m": e, "min_agl_m": mn, "max_agl_m": mx}
-                for s, e, mn, mx in poi_band_overrides
-            ])
+            poi_bands_json_str = json.dumps(
+                [
+                    {"start_m": s, "end_m": e, "min_agl_m": mn, "max_agl_m": mx}
+                    for s, e, mn, mx in poi_band_overrides
+                ]
+            )
 
         waypoint_indices_json_str: str | None = (
             json.dumps(waypoint_indices) if waypoint_indices else None
         )
 
         zip_buf = build_zip(
-            wp_json_str, combined_html, log_txt,
+            wp_json_str,
+            combined_html,
+            log_txt,
             kml_str=kml_str,
             agl_profile_json=agl_profile_json_str,
             poi_bands_json=poi_bands_json_str,
@@ -469,43 +505,54 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
             elev_flat = dsm_index.sample_points(grid_pts)
             terrain_grid = elev_flat.reshape(config.DEM_GRID_SIZE, config.DEM_GRID_SIZE)
             # Convert grid UTM centres to lat/lon arrays for the PDF terrain map
-            tg_lons = np.array([utm_to_latlon(float(e), float(n_grid.mean()), zone_str)[1] for e in e_grid])
-            tg_lats = np.array([utm_to_latlon(float(e_grid.mean()), float(n), zone_str)[0] for n in n_grid])
+            tg_lons = np.array(
+                [utm_to_latlon(float(e), float(n_grid.mean()), zone_str)[1] for e in e_grid]
+            )
+            tg_lats = np.array(
+                [utm_to_latlon(float(e_grid.mean()), float(n), zone_str)[0] for n in n_grid]
+            )
         except Exception as exc:
-            logger.warning("Terrain grid sampling skipped (PDF terrain map unavailable): %s", exc, exc_info=True)
+            logger.warning(
+                "Terrain grid sampling skipped (PDF terrain map unavailable): %s",
+                exc,
+                exc_info=True,
+            )
             terrain_grid = tg_lons = tg_lats = None
 
         lats_arr = np.array([w.lat for w in dense_wps])
         lons_arr = np.array([w.lon for w in dense_wps])
 
-        store_plan_data(req.session_id, LastPlanData(
-            lats=lats_arr,
-            lons=lons_arr,
-            final_alts=final_alts,
-            terrain_elevs=terrain_elevs,
-            agl_arr=agl_arr,
-            cum_dists=cum_dists,
-            cum_energy=cum_energy,
-            start_index=0,
-            landing_index=landing_index,
-            poi_indices=poi_indices or [],
-            waypoint_indices=waypoint_indices or [],
-            poi_distances=poi_distances or [],
-            pois=req.pois,
-            meta=meta,
-            fc=fc,
-            route_hash=route_hash,
-            mission_name=req.name or "",
-            zone_str=zone_str,
-            generated_at=datetime.now(timezone.utc).isoformat(),
-            terrain_grid=terrain_grid,
-            terrain_grid_lons=tg_lons,
-            terrain_grid_lats=tg_lats,
-            waypoints_list=waypoints_json,
-            no_terrain_mask=nan_mask,
-            zip_bytes=zip_buf.getvalue(),
-            poi_bands_list=json.loads(poi_bands_json_str) if poi_bands_json_str else None,
-        ))
+        store_plan_data(
+            req.session_id,
+            LastPlanData(
+                lats=lats_arr,
+                lons=lons_arr,
+                final_alts=final_alts,
+                terrain_elevs=terrain_elevs,
+                agl_arr=agl_arr,
+                cum_dists=cum_dists,
+                cum_energy=cum_energy,
+                start_index=0,
+                landing_index=landing_index,
+                poi_indices=poi_indices or [],
+                waypoint_indices=waypoint_indices or [],
+                poi_distances=poi_distances or [],
+                pois=req.pois,
+                meta=meta,
+                fc=fc,
+                route_hash=route_hash,
+                mission_name=req.name or "",
+                zone_str=zone_str,
+                generated_at=datetime.now(UTC).isoformat(),
+                terrain_grid=terrain_grid,
+                terrain_grid_lons=tg_lons,
+                terrain_grid_lats=tg_lats,
+                waypoints_list=waypoints_json,
+                no_terrain_mask=nan_mask,
+                zip_bytes=zip_buf.getvalue(),
+                poi_bands_list=json.loads(poi_bands_json_str) if poi_bands_json_str else None,
+            ),
+        )
 
         # Strip internal editor files before sending to the user.
         # meta.json is already embedded in zip_buf by build_zip().
@@ -526,6 +573,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+
 
 def _pick_terrain(pref: str, dsm: TerrainIndex, dtm: TerrainIndex) -> TerrainIndex:
     """Return dtm or dsm based on the user preference string.
@@ -611,19 +659,28 @@ def _expand_maneuver_latlon(
     if m.type == "lawnmower":
         if m.polygon:
             return generate_lawnmower_polygon_pattern(
-                m.polygon, m.sweep_spacing_m, zone_str,
+                m.polygon,
+                m.sweep_spacing_m,
+                zone_str,
                 prefer_start=prev_point,
             )
-        return generate_lawnmower_pattern(center, m.width_m, m.height_m, m.sweep_spacing_m, entry_bearing)
+        return generate_lawnmower_pattern(
+            center, m.width_m, m.height_m, m.sweep_spacing_m, entry_bearing
+        )
 
     if m.type == "warp_weft":
         if m.polygon:
             wps_a = generate_lawnmower_polygon_pattern(
-                m.polygon, m.sweep_spacing_m, zone_str,
+                m.polygon,
+                m.sweep_spacing_m,
+                zone_str,
                 prefer_start=prev_point,
             )
             wps_b = generate_lawnmower_polygon_pattern(
-                m.polygon, m.sweep_spacing_m, zone_str, transpose=True,
+                m.polygon,
+                m.sweep_spacing_m,
+                zone_str,
+                transpose=True,
             )
             return wps_a + wps_b
         return generate_warp_and_weft_pattern(center, m.width_m, m.height_m, m.sweep_spacing_m)

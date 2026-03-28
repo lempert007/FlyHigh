@@ -379,5 +379,402 @@
   </ul>
 </div>
 
+<div class="divider"></div>
+
+<!-- ── Codebase Architecture ──────────────────────────────────────────────── -->
+<style>
+  /* ── Flow diagram ────────────────────────────────────────── */
+  .arch-title { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.1em; color: #8b949e; margin-bottom: 18px; }
+  .flow {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 0;
+    margin-bottom: 32px;
+  }
+  .flow-box {
+    background: #161b22; border: 1px solid #30363d; border-radius: 8px;
+    padding: 10px 14px; font-size: 0.78rem; color: #e6edf3; font-weight: 600;
+    white-space: nowrap;
+  }
+  .flow-arrow {
+    color: #30363d; font-size: 1.2rem; padding: 0 6px; flex-shrink: 0;
+  }
+  .flow-box.blue   { border-color: #1f6feb; color: #58a6ff; }
+  .flow-box.green  { border-color: #238636; color: #3fb950; }
+  .flow-box.orange { border-color: #9e6a03; color: #e3b341; }
+  .flow-box.purple { border-color: #6e40c9; color: #bc8cff; }
+  .flow-box.red    { border-color: #b22222; color: #f78166; }
+
+  /* ── Module cards grid ───────────────────────────────────── */
+  .modules { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 700px) { .modules { grid-template-columns: 1fr; } }
+
+  .mod {
+    background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+    padding: 15px 16px;
+  }
+  .mod-path {
+    font-size: 0.68rem; font-family: "Consolas", monospace;
+    color: #8b949e; margin-bottom: 6px;
+  }
+  .mod-name {
+    font-size: 0.86rem; font-weight: 700; color: #e6edf3; margin-bottom: 8px;
+  }
+  .mod-desc {
+    font-size: 0.76rem; color: #8b949e; line-height: 1.5; margin-bottom: 10px;
+  }
+  .fn-list {
+    list-style: none; padding: 0; margin: 0;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .fn-list li {
+    font-size: 0.7rem; font-family: "Consolas", monospace;
+    color: #58a6ff; background: #1c2a3a; border: 1px solid #1f6feb22;
+    border-radius: 4px; padding: 2px 7px;
+  }
+  .mod.green  { border-color: #238636; }
+  .mod.orange { border-color: #9e6a03; }
+  .mod.purple { border-color: #6e40c9; }
+  .mod.red    { border-color: #b22222; }
+  .mod.teal   { border-color: #1abc9c55; }
+  .mod.green  .fn-list li { color: #3fb950; background: #1e2a1e; border-color: #23863622; }
+  .mod.orange .fn-list li { color: #e3b341; background: #2a241a; border-color: #9e6a0322; }
+  .mod.purple .fn-list li { color: #bc8cff; background: #21193a; border-color: #6e40c922; }
+  .mod.red    .fn-list li { color: #f78166; background: #2a1e1e; border-color: #b2222222; }
+  .mod.teal   .fn-list li { color: #1abc9c; background: #141e1e; border-color: #1abc9c22; }
+  .section-label {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: #8b949e; margin: 22px 0 10px; font-weight: 600;
+  }
+</style>
+
+<p class="arch-title">Codebase Architecture — Request Flow</p>
+
+<!-- Request flow diagram -->
+<div class="flow">
+  <div class="flow-box blue">Browser</div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box blue">api/plan.py<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">POST /plan</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box green">core/poi.py<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">pattern gen</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box green">core/route.py<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">assembly</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box green">core/altitude.py<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">9-step planner</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box red">core/safety.py<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">violations</span></div>
+  <div class="flow-arrow">→</div>
+  <div class="flow-box orange">export/<br><span style="font-size:0.65rem;font-weight:400;color:#8b949e">ZIP + header</span></div>
+</div>
+
+<!-- Supporting modules note -->
+<p style="font-size:0.75rem;color:#8b949e;margin-bottom:28px;">
+  <b style="color:#c9d1d9">core/terrain.py</b> is used at every stage that needs elevation data.
+  <b style="color:#c9d1d9">core/battery.py</b> and <b style="color:#c9d1d9">core/band.py</b> are called from within the altitude planner.
+  <b style="color:#c9d1d9">session.py</b> holds open rasterio file handles between requests.
+</p>
+
+<!-- API layer -->
+<p class="section-label">API Layer — backend/api/</p>
+<div class="modules">
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/plan.py</div>
+    <div class="mod-name">Planning Pipeline</div>
+    <div class="mod-desc">Orchestrates the full mission plan: assembles the route, runs the altitude planner, executes safety checks, and packages the ZIP response.</div>
+    <ul class="fn-list">
+      <li>plan_route(request)</li>
+      <li>_expand_maneuver_latlon(poi, ...)</li>
+      <li>_build_violations(violations)</li>
+    </ul>
+  </div>
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/upload.py</div>
+    <div class="mod-name">Terrain Ingestion</div>
+    <div class="mod-desc">Accepts GeoTIFF uploads, reprojects them to UTM via rasterio, and stores open DatasetReader handles in the session store.</div>
+    <ul class="fn-list">
+      <li>upload_files(files, file_types)</li>
+    </ul>
+  </div>
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/altitude_edit.py</div>
+    <div class="mod-name">Manual Altitude Edit</div>
+    <div class="mod-desc">Accepts manually adjusted waypoint altitudes from the editor UI and re-runs only the safety checks, returning an updated violation list without replanning.</div>
+    <ul class="fn-list">
+      <li>altitude_edit(request)</li>
+    </ul>
+  </div>
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/missions.py</div>
+    <div class="mod-name">Mission CRUD</div>
+    <div class="mod-desc">Reads and writes mission state (route + config) to JSON files on disk under <code>backend/missions/</code>.</div>
+    <ul class="fn-list">
+      <li>list_missions()</li>
+      <li>get_mission(folder)</li>
+      <li>save_mission(folder, body)</li>
+      <li>delete_mission(folder)</li>
+    </ul>
+  </div>
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/pdf.py</div>
+    <div class="mod-name">PDF Report</div>
+    <div class="mod-desc">Generates an on-demand PDF report from the last plan result. Sections: summary stats, coverage, violation tables per category, altitude profile charts.</div>
+    <ul class="fn-list">
+      <li>generate_pdf(request)</li>
+    </ul>
+  </div>
+
+  <div class="mod blue" style="border-color:#1f6feb;">
+    <div class="mod-path">backend/api/settings.py · presets.py · terrain.py</div>
+    <div class="mod-name">Config Endpoints</div>
+    <div class="mod-desc">Serve global user settings (GET/POST), built-in drone presets, and the list of pre-loaded GeoTIFF files from the terrain library folder.</div>
+    <ul class="fn-list">
+      <li>get_settings() / save_settings()</li>
+      <li>get_presets()</li>
+      <li>get_terrain_library()</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- Core layer -->
+<p class="section-label">Core Layer — backend/core/</p>
+<div class="modules">
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/altitude.py</div>
+    <div class="mod-name">Altitude Planner</div>
+    <div class="mod-desc">The heart of FlyHigh. Runs the 9-step altitude planning algorithm: resolves takeoff, inserts zone crossings, computes leg bands, propagates climb limits, selects cruise altitudes, and inserts ramp + terrain-pin waypoints.</div>
+    <ul class="fn-list">
+      <li>plan_altitude(legs, params, terrain)</li>
+      <li>_insert_zone_crossings(legs)</li>
+      <li>_propagate_climb_limits(legs)</li>
+      <li>_insert_ramp_points(legs)</li>
+      <li>_insert_terrain_pins(ramp, terrain)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/poi.py</div>
+    <div class="mod-name">Scan Pattern Generator</div>
+    <div class="mod-desc">Generates boustrophedon (lawnmower) sweep strips for rectangular and custom-polygon POI areas. Supports transposed (warp-weft) passes. Entry corner is chosen to be closest to the previous waypoint.</div>
+    <ul class="fn-list">
+      <li>generate_lawnmower_pattern(...)</li>
+      <li>generate_lawnmower_polygon_pattern(..., prefer_start)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/route.py</div>
+    <div class="mod-name">Route Assembly</div>
+    <div class="mod-desc">Converts the user's sparse keypoints (start, waypoints, POI patterns, RTH) into an ordered flat list. Handles entry bearings for rectangular scans.</div>
+    <ul class="fn-list">
+      <li>assemble_route(start, waypoints, pois)</li>
+      <li>compute_entry_bearing(prev, poi)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/terrain.py</div>
+    <div class="mod-name">Terrain Index</div>
+    <div class="mod-desc">Reprojects a GeoTIFF to UTM and builds a <code>RegularGridInterpolator</code> over it. Provides point-sampling used by every other module. Out-of-bounds queries return NaN (graceful degradation).</div>
+    <ul class="fn-list">
+      <li>TerrainIndex(dataset, zone_str)</li>
+      <li>TerrainIndex.sample_points(utm_pts)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/band.py</div>
+    <div class="mod-name">AGL Band Calculator</div>
+    <div class="mod-desc">For each flight leg, samples the terrain at a fixed interval and returns the floor (peak terrain + min AGL) and ceiling (lowest terrain + max AGL) constraints.</div>
+    <ul class="fn-list">
+      <li>compute_band(leg, terrain, params)</li>
+    </ul>
+  </div>
+
+  <div class="mod red">
+    <div class="mod-path">backend/core/safety.py</div>
+    <div class="mod-name">Safety Checker</div>
+    <div class="mod-desc">Runs three vectorised checks on the final dense route: vertical clearance (hard), horizontal bubble (hard), and camera range (soft). Returns structured <code>Violation</code> objects.</div>
+    <ul class="fn-list">
+      <li>check_route_safety(waypoints, utm_pts, vertical_terrain, bubble_terrain, camera_terrain, params)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/battery.py</div>
+    <div class="mod-name">Battery Model</div>
+    <div class="mod-desc">Estimates total energy consumption and flight time using a physics model (hover power + horizontal power as a function of drone weight, speed, and air density).</div>
+    <ul class="fn-list">
+      <li>estimate_battery(waypoints, params)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/geometry.py</div>
+    <div class="mod-name">Geometry Utilities</div>
+    <div class="mod-desc">Polygon clipping (Sutherland-Hodgman), area computation, centroid, and convex-hull helpers used by the scan pattern generator and coverage statistics.</div>
+    <ul class="fn-list">
+      <li>clip_polygon(subject, clip)</li>
+      <li>polygon_area_m2(polygon_utm)</li>
+    </ul>
+  </div>
+
+  <div class="mod green">
+    <div class="mod-path">backend/core/utm_utils.py · types.py</div>
+    <div class="mod-name">Shared Utilities</div>
+    <div class="mod-desc"><b>utm_utils</b>: LatLon ↔ UTM conversion (wraps the <code>utm</code> package). <b>types</b>: shared dataclasses — <code>Waypoint3D</code>, <code>LatLon</code>, <code>Violation</code>, <code>FlightParams</code>, <code>ViolationTier</code>.</div>
+    <ul class="fn-list">
+      <li>latlon_to_utm(lat, lon)</li>
+      <li>utm_to_latlon(e, n, zone_str)</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- Export layer -->
+<p class="section-label">Export Layer — backend/export/</p>
+<div class="modules">
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/packager.py</div>
+    <div class="mod-name">ZIP Packager</div>
+    <div class="mod-desc">Calls every renderer in sequence and assembles their outputs into a single in-memory ZIP, returned as the HTTP response body.</div>
+    <ul class="fn-list">
+      <li>build_zip(waypoints, meta, ...)</li>
+    </ul>
+  </div>
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/render_combined.py</div>
+    <div class="mod-name">Combined HTML Report</div>
+    <div class="mod-desc">Assembles the interactive HTML mission report: inlines the 2-D Folium map, 3-D Plotly terrain view, and altitude profile into a single self-contained file.</div>
+    <ul class="fn-list">
+      <li>render_combined_report(...)</li>
+    </ul>
+  </div>
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/render_profile.py</div>
+    <div class="mod-name">Altitude Profile Chart</div>
+    <div class="mod-desc">Produces a Plotly HTML chart showing the terrain surface, AGL band, drone flight path, and colour-coded violation markers. Hover shows AGL at each point.</div>
+    <ul class="fn-list">
+      <li>render_profile(waypoints, terrain, violations)</li>
+    </ul>
+  </div>
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/render_pdf.py</div>
+    <div class="mod-name">PDF Report</div>
+    <div class="mod-desc">Generates a multi-page PDF using fpdf2. Includes: summary stats table, coverage breakdown, three separate violation tables (Safety / Scan / Transit), and embedded Matplotlib charts.</div>
+    <ul class="fn-list">
+      <li>render_pdf(plan_meta, waypoints, ...)</li>
+      <li>FlyHighPDF.violation_table(violations)</li>
+      <li>FlyHighPDF.section_title(text)</li>
+    </ul>
+  </div>
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/render_map.py · render_3d.py · render_kml.py</div>
+    <div class="mod-name">Map / 3D / KML Renders</div>
+    <div class="mod-desc"><b>render_map</b>: Folium 2-D interactive map with route and violation markers. <b>render_3d</b>: Plotly 3-D terrain mesh with drone path. <b>render_kml</b>: KML file importable into Google Earth.</div>
+    <ul class="fn-list">
+      <li>render_map(waypoints, violations)</li>
+      <li>render_3d(waypoints, terrain)</li>
+      <li>render_kml(waypoints)</li>
+    </ul>
+  </div>
+
+  <div class="mod orange">
+    <div class="mod-path">backend/export/waypoints.py · mission_log.py</div>
+    <div class="mod-name">Waypoints &amp; Log</div>
+    <div class="mod-desc"><b>waypoints</b>: Serialises the final <code>Waypoint3D</code> list to JSON and CSV formats. <b>mission_log</b>: Writes a human-readable text log with statistics, warnings, and violation summaries.</div>
+    <ul class="fn-list">
+      <li>waypoints_to_json(waypoints)</li>
+      <li>build_mission_log(meta, violations)</li>
+    </ul>
+  </div>
+
+</div>
+
+<!-- Frontend layer -->
+<p class="section-label">Frontend — React + MUI + Leaflet</p>
+<div class="modules">
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/App.tsx</div>
+    <div class="mod-name">App Shell</div>
+    <div class="mod-desc">Top-level component. Owns the mission state, plan results, violation filter toggles, and terrain session. Composes the map, sidebar, and modals. Mounted at <code>/missions/:folder</code>.</div>
+    <ul class="fn-list">
+      <li>useMissionState()</li>
+      <li>usePlanRoute()</li>
+      <li>violationFilters state</li>
+    </ul>
+  </div>
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/components/map/</div>
+    <div class="mod-name">Map Layer</div>
+    <div class="mod-desc">Leaflet map with drawing tools. <b>MapCanvas</b> is the container. <b>MapMarkers</b> draws start/POI/waypoint pins. <b>MapRoute</b> draws the planned path. <b>MapViolationLayer</b> draws colour-coded "!" violation markers (Safety=red, Scan=orange, Transit=yellow).</div>
+    <ul class="fn-list">
+      <li>MapCanvas → MapMarkers</li>
+      <li>MapCanvas → MapRoute</li>
+      <li>MapCanvas → MapViolationLayer</li>
+      <li>makeViolationIcon(category)</li>
+    </ul>
+  </div>
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/components/sidebar/</div>
+    <div class="mod-name">Sidebar Tabs</div>
+    <div class="mod-desc">Three-tab sidebar: <b>Mission</b> (point list, POI configuration), <b>Config</b> (flight parameters, drone presets), <b>Results</b> (violations, download, PDF export). <b>LiveEstimatesBar</b> shows pre-plan battery/time estimates in real time.</div>
+    <ul class="fn-list">
+      <li>SidebarShell → MissionTab</li>
+      <li>SidebarShell → ConfigTab</li>
+      <li>SidebarShell → ResultsTab</li>
+      <li>LiveEstimatesBar (useLiveEstimates)</li>
+    </ul>
+  </div>
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/hooks/</div>
+    <div class="mod-name">Custom Hooks</div>
+    <div class="mod-desc">All stateful logic lives in hooks, not components. <b>useMissionState</b> manages the point list. <b>usePlanRoute</b> fires the POST /plan request and parses the response. <b>useDraftPersistence</b> auto-saves to localStorage. <b>useUndoRedo</b> wraps any state with history.</div>
+    <ul class="fn-list">
+      <li>useMissionState()</li>
+      <li>usePlanRoute(session, state)</li>
+      <li>useLiveEstimates(state)</li>
+      <li>useDraftPersistence(folder, state)</li>
+    </ul>
+  </div>
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/api/index.ts</div>
+    <div class="mod-name">API Client</div>
+    <div class="mod-desc">All HTTP calls to the backend are centralised here. Each function maps to one API endpoint. Returns typed responses or throws on error. Used by hooks, not directly by components.</div>
+    <ul class="fn-list">
+      <li>planRoute(request)</li>
+      <li>uploadTerrain(files, types)</li>
+      <li>getMission(folder)</li>
+      <li>saveMission(folder, state)</li>
+      <li>generatePdf(meta)</li>
+    </ul>
+  </div>
+
+  <div class="mod purple">
+    <div class="mod-path">frontend/src/components/ResultsPanel.tsx</div>
+    <div class="mod-name">Results Panel</div>
+    <div class="mod-desc">Displays flight stats, battery usage, and the violation list grouped by category (Safety / Scan / Transit). Three chip toggles control which violation categories are shown on the Leaflet map.</div>
+    <ul class="fn-list">
+      <li>violationFilters prop</li>
+      <li>onToggleViolationCategory(cat)</li>
+    </ul>
+  </div>
+
+</div>
+
 </body>
 </html>

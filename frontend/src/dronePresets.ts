@@ -3,7 +3,10 @@ import type { FlightConfig } from "./types/mission";
 export interface DronePreset {
   label: string;
   description: string;
-  config: Pick<FlightConfig, "cruise_speed_ms" | "climb_rate_ms" | "battery_wh" | "drone_weight_kg">;
+  config: Pick<
+    FlightConfig,
+    "cruise_speed_ms" | "climb_rate_ms" | "battery_wh" | "drone_weight_kg"
+  >;
 }
 
 export const DRONE_PRESETS: DronePreset[] = [
@@ -34,7 +37,7 @@ export const DRONE_PRESETS: DronePreset[] = [
       cruise_speed_ms: 25,
       climb_rate_ms: 4,
       battery_wh: 300,
-      drone_weight_kg: 1.500,
+      drone_weight_kg: 1.5,
     },
   },
 ];

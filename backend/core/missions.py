@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 import zipfile
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 import config
 
@@ -77,21 +77,31 @@ def list_missions() -> list[dict]:
         if not os.path.isfile(json_file):
             continue
         try:
-            with open(json_file, "r", encoding="utf-8") as f:
+            with open(json_file, encoding="utf-8") as f:
                 data = json.load(f)
             route = data.get("route", {})
             start = route.get("start")
-            wps = [{"lat": w["lat"], "lon": w["lon"]} for w in route.get("waypoints", []) if isinstance(w, dict) and "lat" in w]
-            pois = [{"lat": p["point"]["lat"], "lon": p["point"]["lon"]} for p in route.get("pois", []) if isinstance(p, dict) and isinstance(p.get("point"), dict)]
-            results.append({
-                "folder": entry,
-                "name": data.get("name", entry),
-                "status": data.get("status", "draft"),
-                "created_at": data.get("created_at", ""),
-                "updated_at": data.get("updated_at", ""),
-                "has_thumbnail": os.path.isfile(os.path.join(folder_path, "thumbnail.png")),
-                "route_preview": {"start": start, "waypoints": wps, "pois": pois},
-            })
+            wps = [
+                {"lat": w["lat"], "lon": w["lon"]}
+                for w in route.get("waypoints", [])
+                if isinstance(w, dict) and "lat" in w
+            ]
+            pois = [
+                {"lat": p["point"]["lat"], "lon": p["point"]["lon"]}
+                for p in route.get("pois", [])
+                if isinstance(p, dict) and isinstance(p.get("point"), dict)
+            ]
+            results.append(
+                {
+                    "folder": entry,
+                    "name": data.get("name", entry),
+                    "status": data.get("status", "draft"),
+                    "created_at": data.get("created_at", ""),
+                    "updated_at": data.get("updated_at", ""),
+                    "has_thumbnail": os.path.isfile(os.path.join(folder_path, "thumbnail.png")),
+                    "route_preview": {"start": start, "waypoints": wps, "pois": pois},
+                }
+            )
         except Exception:
             logger.warning("Failed to read mission %r — skipping", entry)
 
@@ -105,7 +115,7 @@ def load_mission(folder: str) -> dict:
     path = _json_path(folder)
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Mission {folder!r} not found")
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -115,7 +125,7 @@ def save_mission(folder: str, data: dict) -> None:
     mission_dir = _mission_path(folder)
     os.makedirs(mission_dir, exist_ok=True)
 
-    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    data["updated_at"] = datetime.now(UTC).isoformat()
     data["schema_version"] = SCHEMA_VERSION
 
     tmp_path = _json_path(folder) + ".tmp"
@@ -140,7 +150,7 @@ def create_mission(name: str) -> str:
         mission_dir = _mission_path(folder)
 
     os.makedirs(mission_dir, exist_ok=True)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     data = {
         "schema_version": SCHEMA_VERSION,
         "name": name,
@@ -196,7 +206,7 @@ def load_plan_meta(folder: str) -> dict | None:
     if not os.path.isfile(path):
         return None
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return None
@@ -209,6 +219,7 @@ def generate_thumbnail(folder: str, data: dict) -> None:
     """
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
@@ -254,28 +265,36 @@ def generate_thumbnail(folder: str, data: dict) -> None:
             # Draw waypoints
             for wp in waypoints:
                 if isinstance(wp, dict):
-                    ax.plot(wp.get("lon", 0), wp.get("lat", 0), "o",
-                            color="#4fc3f7", markersize=3)
+                    ax.plot(wp.get("lon", 0), wp.get("lat", 0), "o", color="#4fc3f7", markersize=3)
 
             # Draw POIs
             for poi in pois:
                 p = poi.get("point", poi) if isinstance(poi, dict) else None
                 if p and isinstance(p, dict):
-                    ax.plot(p.get("lon", 0), p.get("lat", 0), "s",
-                            color="#ff9800", markersize=4)
+                    ax.plot(p.get("lon", 0), p.get("lat", 0), "s", color="#ff9800", markersize=4)
 
             # Draw start
             if start and isinstance(start, dict):
-                ax.plot(start.get("lon", 0), start.get("lat", 0), "*",
-                        color="#ef5350", markersize=8)
+                ax.plot(
+                    start.get("lon", 0), start.get("lat", 0), "*", color="#ef5350", markersize=8
+                )
         else:
             # Empty mission: show a placeholder icon
-            ax.text(0.5, 0.5, "✈", transform=ax.transAxes,
-                    ha="center", va="center", fontsize=40, color="#4fc3f7")
+            ax.text(
+                0.5,
+                0.5,
+                "✈",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                fontsize=40,
+                color="#4fc3f7",
+            )
 
         plt.tight_layout(pad=0)
-        fig.savefig(_thumbnail_path(folder), dpi=100, bbox_inches="tight",
-                    facecolor=fig.get_facecolor())
+        fig.savefig(
+            _thumbnail_path(folder), dpi=100, bbox_inches="tight", facecolor=fig.get_facecolor()
+        )
         plt.close(fig)
     except Exception:
         logger.warning("Thumbnail generation failed for %r", folder, exc_info=True)
