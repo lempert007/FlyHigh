@@ -92,7 +92,7 @@ def generate_warp_and_weft_pattern(
 
 
 def generate_lawnmower_polygon_pattern(
-    polygon_latlon: list[PointLatLon | LatLon],
+    polygon_latlon: list,  # LatLon or PointLatLon (any object with .lat / .lon)
     sweep_spacing_m: float,
     zone_str: str,
     *,

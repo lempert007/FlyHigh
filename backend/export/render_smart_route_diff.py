@@ -7,6 +7,7 @@ Both panels are embedded in a single self-contained HTML page.
 from __future__ import annotations
 
 import html as _html
+
 import folium
 import numpy as np
 import plotly.graph_objects as go
@@ -42,14 +43,13 @@ def render_smart_route_diff_html(
     cum_dists_km = compute_cumulative_distances(original_pts) / 1000.0
 
     # ── Folium map ─────────────────────────────────────────────────────────────
-    orig_ll  = [utm_to_latlon(float(p[0]), float(p[1]), zone_str) for p in original_pts]
-    opt_ll   = [utm_to_latlon(float(p[0]), float(p[1]), zone_str) for p in optimised_pts]
+    orig_ll = [utm_to_latlon(float(p[0]), float(p[1]), zone_str) for p in original_pts]
+    opt_ll = [utm_to_latlon(float(p[0]), float(p[1]), zone_str) for p in optimised_pts]
 
     center_lat = float(np.mean([ll[0] for ll in orig_ll]))
     center_lon = float(np.mean([ll[1] for ll in orig_ll]))
 
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=14,
-                   tiles="OpenStreetMap")
+    m = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="OpenStreetMap")
 
     # Original path — dashed grey
     folium.PolyLine(
@@ -100,38 +100,41 @@ def render_smart_route_diff_html(
 
     # ── Plotly offset chart ────────────────────────────────────────────────────
     hover_text = [
-        f"Distance: {d:.3f} km<br>Offset: {o:.1f} m"
-        for d, o in zip(cum_dists_km, offsets_m)
+        f"Distance: {d:.3f} km<br>Offset: {o:.1f} m" for d, o in zip(cum_dists_km, offsets_m)
     ]
 
     fig = go.Figure()
 
     # Filled area showing offset magnitude
-    fig.add_trace(go.Scatter(
-        x=cum_dists_km,
-        y=offsets_m,
-        mode="lines",
-        fill="tozeroy",
-        fillcolor="rgba(30,144,255,0.20)",
-        line=dict(color="#1E90FF", width=1.5),
-        hovertemplate="%{customdata}<extra></extra>",
-        customdata=hover_text,
-        name="Lateral offset",
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=cum_dists_km,
+            y=offsets_m,
+            mode="lines",
+            fill="tozeroy",
+            fillcolor="rgba(30,144,255,0.20)",
+            line=dict(color="#1E90FF", width=1.5),
+            hovertemplate="%{customdata}<extra></extra>",
+            customdata=hover_text,
+            name="Lateral offset",
+        )
+    )
 
     # Highlight the peak offset
     peak_idx = int(np.argmax(offsets_m))
-    fig.add_trace(go.Scatter(
-        x=[float(cum_dists_km[peak_idx])],
-        y=[float(offsets_m[peak_idx])],
-        mode="markers+text",
-        marker=dict(color="#ff6347", size=10, symbol="circle"),
-        text=[f"  peak {offsets_m[peak_idx]:.1f} m"],
-        textposition="middle right",
-        textfont=dict(color="#ff6347", size=11),
-        hoverinfo="skip",
-        showlegend=False,
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=[float(cum_dists_km[peak_idx])],
+            y=[float(offsets_m[peak_idx])],
+            mode="markers+text",
+            marker=dict(color="#ff6347", size=10, symbol="circle"),
+            text=[f"  peak {offsets_m[peak_idx]:.1f} m"],
+            textposition="middle right",
+            textfont=dict(color="#ff6347", size=11),
+            hoverinfo="skip",
+            showlegend=False,
+        )
+    )
 
     shifted_pct = float(np.mean(offsets_m > 0.5)) * 100
     subtitle_parts = [
@@ -146,20 +149,25 @@ def render_smart_route_diff_html(
     fig.update_layout(
         title=dict(
             text=f"<b>Lateral Offset vs Distance</b><br>"
-                 f"<span style='font-size:12px;color:#8b949e'>{subtitle}</span>",
-            x=0.5, xanchor="center",
+            f"<span style='font-size:12px;color:#8b949e'>{subtitle}</span>",
+            x=0.5,
+            xanchor="center",
             font=dict(color="#c9d1d9", size=16),
         ),
         paper_bgcolor="#0d1117",
         plot_bgcolor="#0d1117",
         font=dict(color="#c9d1d9", size=12),
         xaxis=dict(
-            title="Distance (km)", gridcolor="#21262d",
-            linecolor="#30363d", zerolinecolor="#30363d",
+            title="Distance (km)",
+            gridcolor="#21262d",
+            linecolor="#30363d",
+            zerolinecolor="#30363d",
         ),
         yaxis=dict(
-            title="Lateral offset (m)", gridcolor="#21262d",
-            linecolor="#30363d", rangemode="tozero",
+            title="Lateral offset (m)",
+            gridcolor="#21262d",
+            linecolor="#30363d",
+            rangemode="tozero",
         ),
         margin=dict(l=60, r=30, t=80, b=50),
         showlegend=False,

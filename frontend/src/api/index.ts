@@ -1,4 +1,3 @@
-import { flushSync } from "react-dom";
 import JSZip from "jszip";
 import type {
   LatLon,
@@ -71,58 +70,33 @@ export async function activateTiffs(selections: TiffSelection[]): Promise<Upload
 /** Cancels any in-flight planRoute request when a new one starts. */
 let _planAbortController: AbortController | null = null;
 
-/** Plan a route via SSE stream. Calls onProgress with real backend step indices.
- * Returns plan metadata from the done event. Aborts after 5 minutes. */
+/** Plan a route. Returns the ZIP blob and plan metadata. Aborts after 5 minutes. */
 export async function planRoute(
   sessionId: string,
-  routeRequest: Record<string, unknown>,
-  onProgress?: (step: number) => void
-): Promise<{ meta: PlanMeta | null }> {
+  routeRequest: Record<string, unknown>
+): Promise<{ blob: Blob; meta: PlanMeta | null }> {
   _planAbortController?.abort();
   const controller = new AbortController();
   _planAbortController = controller;
   const timeout = setTimeout(() => controller.abort(), 300_000);
   try {
-    const body = JSON.stringify({ session_id: sessionId, ...routeRequest });
     const res = await fetch("/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body,
+      body: JSON.stringify({ session_id: sessionId, ...routeRequest }),
       signal: controller.signal,
     });
-    if (!res.ok || !res.body) {
+    if (!res.ok) {
       const data: ErrorBody | null = await res.json().catch(() => null);
       throw new Error(parseErrorDetail(data, `Planning failed: ${res.status}`));
     }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
-        if (event.error) throw new Error(event.error as string);
-        if (event.done) return { meta: (event.meta as PlanMeta) ?? null };
-        if (event.step !== undefined && onProgress) {
-          flushSync(() => onProgress(event.step as number));
-          // Yield to the browser's paint loop so each step is visually rendered
-          // before the next one is processed, even if they arrive in the same TCP chunk.
-          await new Promise<void>((r) => setTimeout(r, 0));
-        }
-      }
-    }
-    return { meta: null };
+    const blob = await res.blob();
+    const metaHeader = res.headers.get("X-Plan-Meta");
+    const meta: PlanMeta | null = metaHeader ? (JSON.parse(metaHeader) as PlanMeta) : null;
+    return { blob, meta };
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
+    if (err instanceof Error && err.name === "AbortError")
       throw new Error("Request timed out — please try again.");
-    }
     throw err;
   } finally {
     clearTimeout(timeout);

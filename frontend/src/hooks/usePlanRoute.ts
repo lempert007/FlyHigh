@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import JSZip from "jszip";
 import type { LatLon, Waypoint, Poi, FlightConfig, PlanMeta } from "../types/mission";
-import { planRoute, getPlanResult, buildRouteRequest } from "../api";
+import { planRoute, buildRouteRequest } from "../api";
 
 interface PlanInputs {
   sessionId: string | null;
@@ -142,6 +142,33 @@ console.assert(
   `PLAN_STEPS has ${PLAN_STEPS.length} entries but expected 22`
 );
 
+// Cumulative delay (ms) at which each step label becomes visible.
+// Tuned to feel realistic for a typical ~20 s planning run.
+// Planning always wins: if the fetch completes early, all timers are cancelled.
+const STEP_DELAYS: number[] = [
+  0, // 0  Opening raster tiles
+  400, // 1  Reprojecting CRS
+  1200, // 2  Building RegularGridInterpolator
+  1900, // 3  Tracing transit legs
+  2600, // 4  Generating maneuver sweeps
+  3300, // 5  Inserting zone boundary crossings
+  4100, // 6  Expanding route to sample grid
+  5000, // 7  Sampling terrain profile
+  5900, // 8  Computing AGL floor/ceiling
+  6600, // 9  Backward floor propagation
+  7200, // 10 Forward floor propagation
+  7800, // 11 Forward ceiling propagation
+  8400, // 12 Backward ceiling propagation
+  9000, // 13 Selecting cruise altitudes
+  9800, // 14 Inserting ramp waypoints
+  10800, // 15 Scanning surface clearance
+  11600, // 16 Verifying AGL band compliance
+  12400, // 17 Checking battery budget
+  13200, // 18 Densifying waypoints
+  14000, // 19 Writing waypoints.json
+  14800, // 20 Generating mission_log.txt
+  15600, // 21 Assembling ZIP archive
+];
 
 interface UsePlanRouteReturn {
   isPlanning: boolean;
@@ -183,6 +210,11 @@ export function usePlanRoute(inputs: PlanInputs, onSuccess: OnSuccessCallback): 
     setIsPlanning(true);
     setPlanningStep(0);
 
+    // Fire fake progress timers while the real fetch runs in parallel.
+    const timers = STEP_DELAYS.slice(1).map((delay, i) =>
+      setTimeout(() => setPlanningStep(i + 1), delay)
+    );
+
     try {
       const request = buildRouteRequest({
         start,
@@ -193,8 +225,7 @@ export function usePlanRoute(inputs: PlanInputs, onSuccess: OnSuccessCallback): 
         notes: missionNotes,
         takeoff_alt_m: takeoffMode === "fixed" ? Number(takeoffAltM) : undefined,
       });
-      const { meta } = await planRoute(sessionId, request, setPlanningStep);
-      const blob = await getPlanResult(sessionId);
+      const { blob, meta } = await planRoute(sessionId, request);
 
       let routePoints: LatLon[] = [];
       let routeAglProfile: number[] | null = null;
@@ -220,6 +251,7 @@ export function usePlanRoute(inputs: PlanInputs, onSuccess: OnSuccessCallback): 
     } catch (err) {
       setPlanError(err instanceof Error ? err.message : String(err));
     } finally {
+      timers.forEach(clearTimeout);
       setIsPlanning(false);
       setPlanningStep(null);
     }

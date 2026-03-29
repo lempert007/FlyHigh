@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import math
 import os
-from typing import Callable, Literal
+from typing import Literal
 
 import numpy as np
 import rasterio
@@ -100,7 +100,11 @@ class TerrainIndex:
         nan_mask = np.isnan(elev_vals)
         if nan_mask.any():
             valid = elev_vals[~nan_mask]
-            safe_fill = float(valid.max()) + config.DEFAULT_MAX_AGL_M if len(valid) > 0 else config.DEFAULT_MAX_AGL_M
+            safe_fill = (
+                float(valid.max()) + config.DEFAULT_MAX_AGL_M
+                if len(valid) > 0
+                else config.DEFAULT_MAX_AGL_M
+            )
             elev_vals = np.where(nan_mask, safe_fill, elev_vals)
 
         samples = [
@@ -176,16 +180,16 @@ class TerrainIndex:
         # Lateral scales match the safety checker's 3-ring structure (R/3, 2R/3, R)
         # so the ribbon floor is consistent with what the safety checker enforces.
         directions = [
-            (0.0, 0.0),          # center
-            (1.0, 0.0),          # right R
-            (-1.0, 0.0),         # left R
-            (2 / 3, 0.0),        # right 2R/3
-            (-2 / 3, 0.0),       # left 2R/3
-            (1 / 3, 0.0),        # right R/3  ← inner ring, matches safety checker
-            (-1 / 3, 0.0),       # left R/3
-            (0.0, 1.0),          # ahead R  ← catches hill-approach violations
-            (0.0, 2 / 3),        # ahead 2R/3
-            (0.0, 1 / 3),        # ahead R/3
+            (0.0, 0.0),  # center
+            (1.0, 0.0),  # right R
+            (-1.0, 0.0),  # left R
+            (2 / 3, 0.0),  # right 2R/3
+            (-2 / 3, 0.0),  # left 2R/3
+            (1 / 3, 0.0),  # right R/3  ← inner ring, matches safety checker
+            (-1 / 3, 0.0),  # left R/3
+            (0.0, 1.0),  # ahead R  ← catches hill-approach violations
+            (0.0, 2 / 3),  # ahead 2R/3
+            (0.0, 1 / 3),  # ahead R/3
         ]
         all_pts = []
         for ps, fs in directions:
@@ -245,18 +249,12 @@ class TerrainIndex:
 # ── Factory ───────────────────────────────────────────────────────────────────
 
 
-def build_terrain_index(
-    dataset: rasterio.DatasetReader,
-    on_reproject: Callable[[], None] | None = None,
-    on_interpolate: Callable[[], None] | None = None,
-) -> TerrainIndex:
+def build_terrain_index(dataset: rasterio.DatasetReader) -> TerrainIndex:
     """Reproject a raster to its natural UTM zone and build a TerrainIndex.
 
     Preserves bilinear resampling and no-data→NaN behaviour.
-    on_reproject: called just before the (slow) rasterio reproject.
-    on_interpolate: called just before building the RegularGridInterpolator.
     """
-    interpolator, zone_str, resolution_m = reproject_to_utm(dataset, on_reproject, on_interpolate)
+    interpolator, zone_str, resolution_m = reproject_to_utm(dataset)
     return TerrainIndex(interpolator, zone_str, resolution_m)
 
 
@@ -275,11 +273,7 @@ def load_tiff(path: str) -> rasterio.DatasetReader:
     return ds
 
 
-def reproject_to_utm(
-    ds: rasterio.DatasetReader,
-    on_reproject: Callable[[], None] | None = None,
-    on_interpolate: Callable[[], None] | None = None,
-) -> tuple[RegularGridInterpolator, str, float]:
+def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolator, str, float]:
     """Reproject a raster to its natural UTM zone and build a terrain interpolator.
 
     Returns:
@@ -312,8 +306,6 @@ def reproject_to_utm(
         top=ds.bounds.top,
     )
 
-    if on_reproject:
-        on_reproject()
     logger.info("Reprojecting CRS -> UTM coordinate frame")
     destination = np.empty((height, width), dtype=np.float64)
     nodata_val = ds.nodata if ds.nodata is not None else config.NODATA_FILL
@@ -342,8 +334,6 @@ def reproject_to_utm(
     n_axis_sorted = n_axis[::-1]
     elev_grid = destination[::-1, :]
 
-    if on_interpolate:
-        on_interpolate()
     logger.info("Building terrain interpolator")
     interpolator = RegularGridInterpolator(
         (n_axis_sorted, e_axis),

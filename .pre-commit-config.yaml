@@ -25,6 +25,6 @@ repos:
       - id: eslint
         name: ESLint (frontend)
         language: system
-        entry: frontend/node_modules/.bin/eslint --fix --max-warnings=0
+        entry: frontend/node_modules/.bin/eslint --fix --max-warnings=0 --config frontend/eslint.config.js
         files: ^frontend/src/.*\.(ts|tsx)$
         pass_filenames: true

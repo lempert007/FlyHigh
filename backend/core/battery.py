@@ -42,7 +42,7 @@ class FlightEstimate:
 
 def hover_power_w(weight_kg: float) -> float:
     """Momentum theory hover power: P = HOVER_POWER_SCALE_W × weight_kg^1.5 (Watts)."""
-    return config.HOVER_POWER_SCALE_W * weight_kg ** 1.5
+    return config.HOVER_POWER_SCALE_W * weight_kg**1.5
 
 
 def cruise_power_w(weight_kg: float, speed_ms: float) -> float:
@@ -60,12 +60,10 @@ def cruise_power_w(weight_kg: float, speed_ms: float) -> float:
     p_hover = hover_power_w(weight_kg)
     v_i = p_hover / (weight_kg * config.GRAVITY_MS2)
     v_ratio = speed_ms / v_i
-    induced_factor = 1.0 / math.sqrt(
-        math.sqrt(1.0 + v_ratio ** 4 / 4.0) + v_ratio ** 2 / 2.0
-    )
+    induced_factor = 1.0 / math.sqrt(math.sqrt(1.0 + v_ratio**4 / 4.0) + v_ratio**2 / 2.0)
     p_induced = p_hover * induced_factor
     p_profile = config.PROFILE_POWER_FRACTION * p_hover
-    p_parasite = 0.5 * config.AIR_DENSITY_KGM3 * config.PARASITE_DRAG_COEFF * speed_ms ** 3
+    p_parasite = 0.5 * config.AIR_DENSITY_KGM3 * config.PARASITE_DRAG_COEFF * speed_ms**3
     return p_induced + p_profile + p_parasite
 
 
@@ -125,9 +123,7 @@ def estimate_flight(
     total_energy_wh = float(cumulative_wh[-1])
     total_time_s = float(np.sum(seg_times))
     budget_pct = (
-        (100.0 * total_energy_wh / params.battery_wh)
-        if params.battery_wh > 0
-        else float("inf")
+        (100.0 * total_energy_wh / params.battery_wh) if params.battery_wh > 0 else float("inf")
     )
 
     return FlightEstimate(

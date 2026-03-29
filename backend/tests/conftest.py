@@ -23,33 +23,40 @@ from rasterio.transform import from_bounds
 
 # Make the backend package importable from the tests subdirectory
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import app  # noqa: E402
 import config  # noqa: E402
+from main import app  # noqa: E402
 
 # ── Raster geography ─────────────────────────────────────────────────────────
 
-CENTER_LAT = 32.5   # clearly inside UTM zone 36S (32–40 °N), avoiding the 32° band boundary
+CENTER_LAT = 32.5  # clearly inside UTM zone 36S (32–40 °N), avoiding the 32° band boundary
 CENTER_LON = 34.8
-SPAN       = 0.05   # degrees — ~5.5 km × ~4.4 km at lat 32
+SPAN = 0.05  # degrees — ~5.5 km × ~4.4 km at lat 32
 
 
 def _make_tiff(data: np.ndarray, span: float = SPAN) -> bytes:
     """Encode a 2-D numpy array as a single-band float32 GeoTIFF bytes."""
     H, W = data.shape
-    west,  east  = CENTER_LON - span / 2, CENTER_LON + span / 2
+    west, east = CENTER_LON - span / 2, CENTER_LON + span / 2
     south, north = CENTER_LAT - span / 2, CENTER_LAT + span / 2
     transform = from_bounds(west, south, east, north, W, H)
     buf = io.BytesIO()
     with rasterio.open(
-        buf, "w",
-        driver="GTiff", height=H, width=W, count=1,
-        dtype="float32", crs=CRS.from_epsg(4326), transform=transform,
+        buf,
+        "w",
+        driver="GTiff",
+        height=H,
+        width=W,
+        count=1,
+        dtype="float32",
+        crs=CRS.from_epsg(4326),
+        transform=transform,
     ) as ds:
         ds.write(data.astype("float32"), 1)
     return buf.getvalue()
 
 
 # ── Terrain fixtures (session-scoped — built once per test run) ───────────────
+
 
 @pytest.fixture(scope="session")
 def flat_tiff() -> bytes:
@@ -91,15 +98,15 @@ def spike_dsm_tiff() -> bytes:
 
 # ── HTTP client fixture ───────────────────────────────────────────────────────
 
+
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
 
 
 # ── TIFF library cleanup fixture ─────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def cleanup_test_tiffs():
@@ -114,6 +121,7 @@ def cleanup_test_tiffs():
 
 
 # ── Helpers (plain functions, not fixtures) ───────────────────────────────────
+
 
 async def upload(
     client,
@@ -175,7 +183,7 @@ def make_request(
         "session_id": session_id,
         "name": "test_mission",
         "notes": "",
-        "start":   {"lat": start_lat, "lon": start_lon},
+        "start": {"lat": start_lat, "lon": start_lon},
         "landing": {"lat": start_lat, "lon": start_lon},
         "waypoints": [],
         "pois": [
@@ -183,7 +191,7 @@ def make_request(
                 "point": {"lat": p["lat"], "lon": p["lon"]},
                 "maneuver": {
                     "type": "lawnmower",
-                    "width_m":  p.get("w", width_m),
+                    "width_m": p.get("w", width_m),
                     "height_m": p.get("h", height_m),
                     "sweep_spacing_m": 30,
                     "poi_min_agl_m": None,
@@ -196,12 +204,12 @@ def make_request(
             "min_agl_m": min_agl,
             "max_agl_m": max_agl,
             "cruise_speed_ms": 10,
-            "climb_rate_ms":   5,
-            "battery_wh":      battery_wh,
+            "climb_rate_ms": 5,
+            "battery_wh": battery_wh,
             "drone_weight_kg": 0.5,
-            "spacing_m":       20,
-            "point_radius_m":  5,
-            "smart_route":        False,
+            "spacing_m": 20,
+            "point_radius_m": 5,
+            "smart_route": False,
             "optimize_poi_order": optimize_order,
             "min_altitude_step_m": min_step_m,
         },
@@ -210,33 +218,17 @@ def make_request(
 
 async def plan(client, request: dict) -> tuple[dict, list[dict]]:
     """
-    POST /plan (SSE stream), consume events until done, then GET /plan/result for ZIP.
+    POST /plan — returns application/zip with X-Plan-Meta header.
     Returns (meta_dict, waypoints_list).
     """
-    session_id = request.get("session_id", "")
-
-    # POST /plan — returns text/event-stream
     resp = await client.post("/plan", json=request)
     assert resp.status_code == 200, f"Plan failed (status {resp.status_code}): {resp.text[:500]}"
 
-    meta: dict | None = None
-    for line in resp.text.split("\n"):
-        if not line.startswith("data: "):
-            continue
-        event: dict = json.loads(line[6:])
-        if event.get("error"):
-            raise AssertionError(f"Plan returned error: {event['error']}")
-        if event.get("done"):
-            meta = event.get("meta") or {}
-            break
+    meta_header = resp.headers.get("x-plan-meta")
+    assert meta_header is not None, "Response missing X-Plan-Meta header"
+    meta: dict = json.loads(meta_header)
 
-    assert meta is not None, "SSE stream ended without a {done: true} event"
-
-    # GET /plan/result — returns the ZIP
-    result_resp = await client.get(f"/plan/result?session_id={session_id}")
-    assert result_resp.status_code == 200, f"plan/result failed: {result_resp.status_code}"
-
-    zf = zipfile.ZipFile(io.BytesIO(result_resp.content))
+    zf = zipfile.ZipFile(io.BytesIO(resp.content))
     waypoints = json.loads(zf.read("waypoints.json"))
 
     return meta, waypoints

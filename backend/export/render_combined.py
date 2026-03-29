@@ -32,9 +32,9 @@ def render_combined_html(
 
     tabs = [
         # map uses srcdoc so Leaflet gets a proper origin and can load tiles/scripts
-        ("map",     "2D Map",           None,                   srcdoc_escape(map_html)),
-        ("terrain", "3D Terrain",       b64(chart_3d_html),     None),
-        ("profile", "Altitude Profile", b64(profile_html),      None),
+        ("map", "2D Map", None, srcdoc_escape(map_html)),
+        ("terrain", "3D Terrain", b64(chart_3d_html), None),
+        ("profile", "Altitude Profile", b64(profile_html), None),
     ]
     if smart_route_diff_html is not None:
         # srcdoc (not data: URI) so nested iframes inside the diff page

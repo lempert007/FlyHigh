@@ -125,7 +125,9 @@ async def get_mission_editor_data(folder: str) -> dict:
         raise HTTPException(status_code=422, detail=str(exc))
     zip_path = _plan_zip_path(folder)
     if not os.path.isfile(zip_path):
-        raise HTTPException(status_code=404, detail="No saved plan for this mission — plan the route first.")
+        raise HTTPException(
+            status_code=404, detail="No saved plan for this mission — plan the route first."
+        )
     try:
         with open(zip_path, "rb") as f:
             zb = f.read()
@@ -158,7 +160,9 @@ async def get_mission_editor_data(folder: str) -> dict:
             "camera_min_terrain": camera_min,
         }
     except KeyError:
-        raise HTTPException(status_code=409, detail="Plan ZIP is missing required files — re-plan the route.")
+        raise HTTPException(
+            status_code=409, detail="Plan ZIP is missing required files — re-plan the route."
+        )
 
 
 @router.post("/{folder}/altitude-edit")
@@ -181,7 +185,9 @@ async def apply_folder_altitude_edit(folder: str, body: AltEditBody) -> Streamin
             old_agl = np.array(json.loads(zf.read("agl_profile.json")), dtype=float)
             meta = PlanMeta(**json.loads(zf.read("meta.json")))
     except KeyError:
-        raise HTTPException(status_code=409, detail="Plan ZIP is missing required files — re-plan the route.")
+        raise HTTPException(
+            status_code=409, detail="Plan ZIP is missing required files — re-plan the route."
+        )
 
     old_alts = np.array([wp["alt_m"] for wp in wps], dtype=float)
     terrain_elevs = old_alts - old_agl

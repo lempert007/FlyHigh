@@ -12,10 +12,7 @@ This module is a thin adapter:
 
 from __future__ import annotations
 
-import asyncio
-import contextvars
 import hashlib
-import io
 import json
 import logging
 import re
@@ -28,7 +25,7 @@ if TYPE_CHECKING:
 import numpy as np
 import utm as _utm_lib
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response
 from scipy.spatial import KDTree
 
 import config
@@ -79,101 +76,14 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# ── SSE progress streaming ─────────────────────────────────────────────────────
-
-# Per-request context: (queue, event_loop) written by the async endpoint,
-# read by _ProgressHandler running inside the thread-pool worker.
-_progress_ctx_var: contextvars.ContextVar[
-    tuple["asyncio.Queue[dict | None]", asyncio.AbstractEventLoop] | None
-] = contextvars.ContextVar("_progress_ctx_var", default=None)
-
-# Phase name for each PLAN_STEPS index (must mirror usePlanRoute.ts PLAN_STEPS)
-_STEP_PHASES = [
-    "terrain", "terrain", "terrain",
-    "route", "route", "route", "route",
-    "altitude", "altitude", "altitude", "altitude", "altitude",
-    "altitude", "altitude", "altitude",
-    "safety", "safety", "safety",
-    "packaging", "packaging", "packaging", "packaging",
-]
-
-# Maps (logger-name-suffix, message-prefix) → PLAN_STEPS index
-_STEP_MAP: list[tuple[str, str, int]] = [
-    ("plan",     "Opening raster",           0),
-    ("terrain",  "Reprojecting CRS",          1),
-    ("terrain",  "Building terrain",         2),
-    ("plan",     "Tracing transit legs",     3),
-    ("plan",     "Generating maneuver",      4),
-    ("altitude", "Step 2a",                  5),
-    ("altitude", "Step 2b",                  6),
-    ("altitude", "Step 3",                   7),
-    ("altitude", "Step 4a",                  8),
-    ("altitude", "Step 4b",                  9),
-    ("altitude", "Step 4c",                 10),
-    ("altitude", "Step 4d",                 11),
-    ("altitude", "Step 5",                  12),
-    ("altitude", "Step 7",                  13),
-    ("altitude", "Step 8",                  14),
-    ("safety",   "Checking vertical",       15),
-    ("safety",   "Verifying safety bubble", 16),
-    ("safety",   "Checking camera",         17),
-    ("route",    "Densifying",              18),
-    ("plan",     "Writing waypoints",       19),
-    ("plan",     "Generating mission_log",  20),
-    ("plan",     "Assembling ZIP",          21),
-]
-
-
-class _ProgressHandler(logging.Handler):
-    """Routes matching log records to the per-request SSE queue (no-op outside plan requests)."""
-
-    def emit(self, record: logging.LogRecord) -> None:
-        ctx = _progress_ctx_var.get(None)
-        if ctx is None:
-            return
-        suffix = record.name.split(".")[-1]
-        msg = record.getMessage()
-        for name_suffix, prefix, step_idx in _STEP_MAP:
-            if suffix == name_suffix and msg.startswith(prefix):
-                queue, loop = ctx
-                event = {"step": step_idx, "phase": _STEP_PHASES[step_idx], "msg": msg}
-                loop.call_soon_threadsafe(queue.put_nowait, event)
-                return
-
-
-# Installed once at import time — no-ops unless a plan request is active.
-logging.getLogger().addHandler(_ProgressHandler())
-
 
 def _zip_filename(mission_name: str) -> str:
     slug = re.sub(r"[^\w\-]", "_", (mission_name or "mission").strip())[:40].strip("_") or "mission"
     return f"{slug}_{date.today().strftime('%Y%m%d')}.zip"
 
 
-def _post_progress_sentinel() -> None:
-    """Post the None sentinel to the SSE queue so the async generator can stop."""
-    ctx = _progress_ctx_var.get(None)
-    if ctx is not None:
-        queue, loop = ctx
-        loop.call_soon_threadsafe(queue.put_nowait, None)
-
-
-def _post_step(step_idx: int) -> None:
-    """Post a progress step event to the SSE queue directly from the planning thread."""
-    ctx = _progress_ctx_var.get(None)
-    if ctx is None:
-        return
-    queue, loop = ctx
-    event = {"step": step_idx, "phase": _STEP_PHASES[step_idx]}
-    loop.call_soon_threadsafe(queue.put_nowait, event)
-
-
-def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
-    """Synchronous planning worker — runs in a thread pool via run_in_executor.
-
-    Returns (user_zip_bytes, meta). Always posts a None sentinel to the SSE queue
-    so the async generator knows when to stop waiting.
-    """
+def _run_planning_sync(req: RouteRequest) -> tuple[bytes, PlanMeta]:
+    """Synchronous planning worker. Returns (user_zip_bytes, meta)."""
     logger.info(
         "Planning route: %d POIs, %d waypoints, smart_route=%s",
         len(req.pois),
@@ -184,12 +94,10 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
     # ── 1. Load session ────────────────────────────────────────────────────────
     sess = session_store.get_session(req.session_id)
     if sess is None:
-        _post_progress_sentinel()
         raise HTTPException(
             status_code=404, detail=f"Session {req.session_id!r} not found or expired"
         )
     if not sess.files:
-        _post_progress_sentinel()
         raise HTTPException(status_code=400, detail="Session contains no uploaded terrain files")
 
     datasets = {name: sf.dataset for name, sf in sess.files.items()}
@@ -206,17 +114,9 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
                 break
 
         # ── 3. Build TerrainIndex objects ─────────────────────────────────────
-        _post_step(0)   # "Opening raster tiles from session store"
-        dsm_index = build_terrain_index(
-            dsm_ds,
-            on_reproject=lambda: _post_step(1),
-            on_interpolate=lambda: _post_step(2),
-        )
-        dtm_index = (
-            build_terrain_index(dtm_ds, on_reproject=lambda: _post_step(1), on_interpolate=lambda: _post_step(2))
-            if dtm_ds is not dsm_ds
-            else dsm_index
-        )
+        logger.info("Opening raster tiles from session store")
+        dsm_index = build_terrain_index(dsm_ds)
+        dtm_index = build_terrain_index(dtm_ds) if dtm_ds is not dsm_ds else dsm_index
 
         zone_str = dtm_index.zone_str
 
@@ -268,7 +168,9 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
         for poi_idx, poi in enumerate(pois_to_plan):
             poi_center = LatLon(lat=poi.point.lat, lon=poi.point.lon)
             entry_bearing = compute_entry_bearing(prev_point, poi_center)
-            zone = build_poi_zone(poi, global_band, zone_str, poi_idx, entry_bearing_deg=entry_bearing)
+            zone = build_poi_zone(
+                poi, global_band, zone_str, poi_idx, entry_bearing_deg=entry_bearing
+            )
             poi_zones.append(zone)
             pattern = _expand_maneuver_latlon(
                 poi,
@@ -387,12 +289,19 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
                 violations_info.append(_violation_to_info(v, int(pidx), category))
 
         # ── 10b. POI scan quality metric ───────────────────────────────────────
+        # Derived from violations_info (the authoritative safety output) so it
+        # stays consistent with all violation types — including the camera-range
+        # check which tests AGL against the lowest nearby surface, not the ground
+        # directly below, and would be missed by a raw agl_arr comparison.
         poi_mask = np.array([a in _POI_ACTIONS for a in dense_actions])
-        valid_poi = poi_mask & ~nan_mask
-        poi_total = int(valid_poi.sum())
+        poi_total = int(poi_mask.sum())
         if poi_total > 0:
-            poi_violated = int((agl_arr[valid_poi] > fc.max_agl_m).sum())
-            poi_scan_good_pct: float | None = round((1 - poi_violated / poi_total) * 100, 1)
+            poi_violated_indices = {
+                v.point_index for v in violations_info if v.category == "product_poi"
+            }
+            poi_scan_good_pct: float | None = round(
+                (1 - len(poi_violated_indices) / poi_total) * 100, 1
+            )
         else:
             poi_scan_good_pct = None
 
@@ -696,69 +605,18 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
     except Exception as exc:
         logger.exception("Planning failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Planning error: {exc}") from exc
-    finally:
-        _post_progress_sentinel()
-
-
-async def _plan_sse_stream(
-    req: RouteRequest,
-    queue: asyncio.Queue,
-    loop: asyncio.AbstractEventLoop,
-):
-    """Async generator that drives the planning thread and yields SSE events.
-
-    The planning work runs in a thread-pool executor (via run_in_executor) so it
-    can do blocking I/O without stalling the event loop.
-
-    run_in_executor does NOT copy the caller's contextvars to the new thread, so we
-    must do it explicitly: copy_context() snapshots the current Context (which already
-    has _progress_ctx_var set), then pass ctx.run as the callable so the thread runs
-    inside that snapshot and can read _progress_ctx_var.
-
-    The planning thread emits progress via loop.call_soon_threadsafe → queue, and posts
-    a None sentinel when it finishes.  We drain the queue here and yield each event as
-    an SSE frame.
-    """
-    # token + reset must happen in the same Context object, so set the var here
-    # (not in the outer endpoint function) before copy_context().
-    token = _progress_ctx_var.set((queue, loop))
-    try:
-        planning_ctx = contextvars.copy_context()
-        planning_task = loop.run_in_executor(None, planning_ctx.run, _run_planning_sync, req)
-
-        # Drain progress events until the planning thread posts the None sentinel.
-        # asyncio.sleep(0) after each yield gives the event loop one iteration to
-        # flush the TCP write buffer before the next event, so each SSE frame is
-        # sent as its own packet rather than all being batched into one.
-        while True:
-            event = await queue.get()
-            if event is None:
-                break
-            yield f"data: {json.dumps(event)}\n\n"
-            await asyncio.sleep(0.05)  # give uvicorn time to flush each event as its own TCP packet
-
-        # Await the result; any exception raised in the thread is re-raised here.
-        _zip_bytes, meta = await planning_task
-        yield f"data: {json.dumps({'done': True, 'meta': json.loads(meta.model_dump_json())})}\n\n"
-    except HTTPException as exc:
-        yield f"data: {json.dumps({'error': exc.detail})}\n\n"
-    except Exception as exc:
-        yield f"data: {json.dumps({'error': str(exc)})}\n\n"
-    finally:
-        _progress_ctx_var.reset(token)
 
 
 @router.post("/plan")
-async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
-    """Stream planning progress as SSE, then signal completion with plan metadata."""
-    loop = asyncio.get_running_loop()
-    queue: asyncio.Queue = asyncio.Queue()
-    return StreamingResponse(
-        _plan_sse_stream(req, queue, loop),
-        media_type="text/event-stream",
+def plan_route_endpoint(req: RouteRequest) -> Response:
+    """Compute an optimised terrain-following route and return a ZIP file."""
+    zip_bytes, meta = _run_planning_sync(req)
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
         headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",  # disables nginx proxy buffering
+            "Content-Disposition": f'attachment; filename="{_zip_filename(req.name)}"',
+            "X-Plan-Meta": json.dumps(json.loads(meta.model_dump_json()), ensure_ascii=True),
         },
     )
 
@@ -777,7 +635,9 @@ async def plan_result_endpoint(session_id: str) -> Response:
             "Content-Disposition": (
                 f'attachment; filename="{_zip_filename(sess.last_plan.mission_name)}"'
             ),
-            "X-Plan-Meta": json.dumps(json.loads(sess.last_plan.meta.model_dump_json()), ensure_ascii=True),
+            "X-Plan-Meta": json.dumps(
+                json.loads(sess.last_plan.meta.model_dump_json()), ensure_ascii=True
+            ),
         },
     )
 
@@ -936,13 +796,3 @@ def _find_poi_block_starts(dense_actions: list[str]) -> list[int]:
             result.append(i)
         prev = action
     return result
-
-
-async def _iter_buf(buf: io.BytesIO):
-    """Yield the ZIP buffer in chunks."""
-    chunk_size = 65536
-    while True:
-        chunk = buf.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk

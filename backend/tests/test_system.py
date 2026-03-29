@@ -5,7 +5,6 @@ Each test exercises the full HTTP stack (upload → plan → parse ZIP + metadat
 Synthetic rasters are used so no real terrain files are needed.
 """
 
-import json
 import statistics
 
 from tests.conftest import CENTER_LAT, CENTER_LON, make_request, plan, upload
@@ -180,9 +179,9 @@ async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_ds
         "with max_agl=80 m above 50 m flat DTM"
     )
     kinds = {v["kind"] for v in meta["violations"]}
-    assert "terrain_band" in kinds, (
-        f"Expected a terrain_band violation for the impossible AGL constraint; got kinds: {kinds}"
-    )
+    assert (
+        "terrain_band" in kinds
+    ), f"Expected a terrain_band violation for the impossible AGL constraint; got kinds: {kinds}"
 
 
 # ── 6. POI outside raster — graceful degradation ─────────────────────────────

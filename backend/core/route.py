@@ -256,9 +256,9 @@ def plan_route(mission: MissionInput) -> MissionResult:
     # the MissionInput — use zones and patterns as-is.
     ordered_zones = mission.poi_zones
     ordered_2d = mission.poi_2d_waypoints
-    assert len(ordered_zones) == len(ordered_2d), (
-        f"Zone/pattern count mismatch: {len(ordered_zones)} zones vs {len(ordered_2d)} patterns"
-    )
+    assert len(ordered_zones) == len(
+        ordered_2d
+    ), f"Zone/pattern count mismatch: {len(ordered_zones)} zones vs {len(ordered_2d)} patterns"
 
     # ── Steps 2–4: Assemble the full 2-D waypoint + action list ───────────────
     waypoints_2d: list[LatLon] = [mission.start]
