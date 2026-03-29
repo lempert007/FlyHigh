@@ -1,3 +1,4 @@
+import { flushSync } from "react-dom";
 import JSZip from "jszip";
 import type {
   LatLon,
@@ -70,13 +71,13 @@ export async function activateTiffs(selections: TiffSelection[]): Promise<Upload
 /** Cancels any in-flight planRoute request when a new one starts. */
 let _planAbortController: AbortController | null = null;
 
-/** Plan a route and get back the ZIP blob + metadata. Aborts after 5 minutes.
- * Automatically cancels any previous in-flight plan request. */
+/** Plan a route via SSE stream. Calls onProgress with real backend step indices.
+ * Returns plan metadata from the done event. Aborts after 5 minutes. */
 export async function planRoute(
   sessionId: string,
-  routeRequest: Record<string, unknown>
-): Promise<{ blob: Blob; meta: PlanMeta | null }> {
-  // Cancel previous request if still pending
+  routeRequest: Record<string, unknown>,
+  onProgress?: (step: number) => void
+): Promise<{ meta: PlanMeta | null }> {
   _planAbortController?.abort();
   const controller = new AbortController();
   _planAbortController = controller;
@@ -89,13 +90,35 @@ export async function planRoute(
       body,
       signal: controller.signal,
     });
-    if (!res.ok) {
+    if (!res.ok || !res.body) {
       const data: ErrorBody | null = await res.json().catch(() => null);
       throw new Error(parseErrorDetail(data, `Planning failed: ${res.status}`));
     }
-    const blob = await res.blob();
-    const meta = await extractMetaFromZip(blob);
-    return { blob, meta };
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const event = JSON.parse(line.slice(6)) as Record<string, unknown>;
+        if (event.error) throw new Error(event.error as string);
+        if (event.done) return { meta: (event.meta as PlanMeta) ?? null };
+        if (event.step !== undefined && onProgress) {
+          flushSync(() => onProgress(event.step as number));
+          // Yield to the browser's paint loop so each step is visually rendered
+          // before the next one is processed, even if they arrive in the same TCP chunk.
+          await new Promise<void>((r) => setTimeout(r, 0));
+        }
+      }
+    }
+    return { meta: null };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Request timed out — please try again.");
@@ -105,6 +128,16 @@ export async function planRoute(
     clearTimeout(timeout);
     if (_planAbortController === controller) _planAbortController = null;
   }
+}
+
+/** Fetch the ZIP from the most recent plan in this session. */
+export async function getPlanResult(sessionId: string): Promise<Blob> {
+  const res = await fetch(`/plan/result?session_id=${encodeURIComponent(sessionId)}`);
+  if (!res.ok) {
+    const data: ErrorBody | null = await res.json().catch(() => null);
+    throw new Error(parseErrorDetail(data, `Failed to fetch plan result: ${res.status}`));
+  }
+  return res.blob();
 }
 
 interface BuildRouteRequestOptions {

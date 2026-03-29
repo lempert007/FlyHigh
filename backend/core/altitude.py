@@ -11,7 +11,7 @@ Algorithm overview (9 steps):
   2a. Insert zone-crossing waypoints (single band per leg).
   2b. Split impossible-band legs recursively (up to depth 3).
   3. Compute per-leg [floor, ceiling, length].
-  4. Propagate slope constraints → effective [eff_lo, eff_hi] intervals (4 O(n) passes).
+  4. Propagate slope constraints → effective [effective_floor, effective_ceiling] intervals (4 O(n) passes).
   5. Select cruise altitude via simple forward clamp (fewest altitude changes).
   6. Clamp start altitude.
   7. Insert ramp waypoints (always fits after Step 4 propagation).
@@ -37,6 +37,7 @@ from core.types import (
     ViolationTier,
     Waypoint3D,
 )
+from core.utm_utils import approx_distance_m
 
 logger = logging.getLogger(__name__)
 
@@ -53,15 +54,6 @@ class AltitudeProfileResult:
 def compute_ramp_distance_m(delta_alt_m: float, params: FlightParams) -> float:
     """Return the horizontal distance required to transition delta_alt_m at max slope."""
     return abs(delta_alt_m) / params.max_climb_slope
-
-
-def _leg_length_m(start: LatLon, end: LatLon) -> float:
-    """Approximate great-circle leg length in metres using flat-earth projection."""
-    dlat = end.lat - start.lat
-    dlon = end.lon - start.lon
-    lat_m = 111_320.0
-    lon_m = 111_320.0 * math.cos(math.radians((start.lat + end.lat) / 2))
-    return math.hypot(dlat * lat_m, dlon * lon_m)
 
 
 def _interpolate_point(start: LatLon, end: LatLon, distance_m: float, total_m: float) -> LatLon:
@@ -218,7 +210,7 @@ def _insert_ramp_pins(
             i += 1
             continue
 
-        seg_len = _leg_length_m(result_points[i - 1], result_points[i])
+        seg_len = approx_distance_m(result_points[i - 1], result_points[i])
         if seg_len < spacing:
             i += 1
             continue
@@ -298,7 +290,7 @@ def plan_altitude_profile(
                 start_elev = max(start_elev, disc_peak)
         start_alt = start_elev + global_band.min_agl_m + 1.0
         logger.info(
-            "Start altitude auto-derived: %.1f m MSL (disc_peak %.1f + min_agl %.1f + 1.0 spare)",
+            "Start altitude auto-derived: %.1f m MSL (terrain_floor %.1f + min_agl %.1f + 1.0 spare)",
             start_alt,
             start_elev,
             global_band.min_agl_m,
@@ -331,7 +323,16 @@ def plan_altitude_profile(
         expanded_points.append(leg_end)
         expanded_actions.append(waypoint_actions[i])
 
+    n_crossings = sum(1 for a in expanded_actions if a == "zone_crossing")
+    logger.info(
+        "Step 2a — zone crossings: %d band-change waypoints inserted (%d input → %d expanded)",
+        n_crossings,
+        len(waypoints_2d),
+        len(expanded_points),
+    )
+
     # ── Step 2b: Split impossible-band legs ────────────────────────────────────
+    _pre_split_count = len(expanded_points)
     expanded_points, expanded_actions = _split_impossible_legs(
         expanded_points,
         expanded_actions,
@@ -344,11 +345,19 @@ def plan_altitude_profile(
     )
 
     n = len(expanded_points)
+    _n_splits = sum(1 for a in expanded_actions if a == "terrain_split")
+    logger.info(
+        "Step 2b — leg splitting: %d midpoints inserted (%d → %d waypoints)",
+        n - _pre_split_count,
+        _pre_split_count,
+        n,
+    )
 
     # ── Step 3: Compute per-leg floor, ceiling, length ─────────────────────────
     # floor[i] = terrain_peak + min_agl  (minimum allowed cruise altitude)
     # ceiling[i] = terrain_valley + max_agl  (maximum allowed cruise altitude)
     # Both derived from the same terrain sample so Step 2b guarantees floor ≤ ceiling.
+    logger.info("Step 3 — sampling bubble-ribbon terrain floor and ceiling per leg: %d legs", n - 1)
     leg_floors: list[float] = []
     leg_ceilings: list[float] = []
     leg_lengths: list[float] = []
@@ -373,6 +382,14 @@ def plan_altitude_profile(
             )
             if math.isnan(terrain_peak):
                 terrain_peak = profile.peak_elevation_msl()
+            # For the last leg, the ribbon only samples forward+lateral — it cannot
+            # see terrain BEHIND the landing direction.  Check the full disc at the
+            # landing point to close that gap (mirrors the start-point disc check in
+            # Step 1 above).
+            if i == n - 2:
+                end_disc_peak = bubble_terrain.disc_peak_at(leg_e, params.point_radius_m)
+                if not math.isnan(end_disc_peak):
+                    terrain_peak = max(terrain_peak, end_disc_peak)
         else:
             terrain_peak = profile.peak_elevation_msl()
 
@@ -395,7 +412,7 @@ def plan_altitude_profile(
                     location=mid,
                     message=(
                         f"Terrain variation ({terrain_peak - terrain_valley:.0f} m) exceeds AGL band "
-                        f"({active_band.max_agl_m - active_band.min_agl_m:.0f} m) on leg {i}→{i + 1}. "
+                        f"({active_band.max_agl_m - active_band.min_agl_m:.0f} m) on leg {i}->{i + 1}. "
                         f"Drone satisfies min AGL above the peak but will exceed max AGL above valleys — "
                         f"widen the AGL band or re-route to avoid this terrain."
                     ),
@@ -405,11 +422,22 @@ def plan_altitude_profile(
             )
             hi = lo  # safety: fly at floor
 
-        leg_len = _leg_length_m(leg_s, leg_e)
+        leg_len = approx_distance_m(leg_s, leg_e)
         leg_floors.append(lo)
         leg_ceilings.append(hi)
         leg_lengths.append(leg_len)
         leg_max_d.append(leg_len * params.max_climb_slope)
+
+    if leg_floors:
+        logger.info(
+            "Step 3 — leg floors: %.1f–%.1f m MSL | ceilings: %.1f–%.1f m MSL (%d legs, floor_spacing=%.1f m)",
+            min(leg_floors),
+            max(leg_floors),
+            min(leg_ceilings),
+            max(leg_ceilings),
+            len(leg_floors),
+            floor_spacing,
+        )
 
     if not leg_floors:
         key_wps = [
@@ -422,36 +450,40 @@ def plan_altitude_profile(
         ]
         return AltitudeProfileResult(key_waypoints_3d=key_wps, violations=violations)
 
-    # ── Step 4: Propagate slope constraints → eff_lo, eff_hi ──────────────────
-    # Four O(n) passes.  Any alt[i] ∈ [eff_lo[i], eff_hi[i]] guarantees a
+    # ── Step 4: Propagate slope constraints → effective_floor, effective_ceiling ─
+    # Four O(n) passes.  Any alt[i] ∈ [effective_floor[i], effective_ceiling[i]] guarantees a
     # slope-feasible, in-band sequence can be completed in both directions.
     N = len(leg_floors)
 
     # Backward floor: how low must we be at leg i to still reach future floors?
-    bwd_lo = list(leg_floors)
+    backward_floor = list(leg_floors)
     for i in range(N - 2, -1, -1):
-        bwd_lo[i] = max(leg_floors[i], bwd_lo[i + 1] - leg_max_d[i])
+        backward_floor[i] = max(leg_floors[i], backward_floor[i + 1] - leg_max_d[i])
+    logger.info("Step 4a — backward floor propagation: %d legs processed", N)
 
     # Forward floor: lowest reachable altitude coming from previous floors.
-    fwd_lo = list(leg_floors)
+    forward_floor = list(leg_floors)
     for i in range(1, N):
-        fwd_lo[i] = max(leg_floors[i], fwd_lo[i - 1] - leg_max_d[i - 1])
+        forward_floor[i] = max(leg_floors[i], forward_floor[i - 1] - leg_max_d[i - 1])
+    logger.info("Step 4b — forward floor propagation: %d legs processed", N)
 
     # Forward ceiling: highest reachable altitude going forward.
-    fwd_hi = list(leg_ceilings)
+    forward_ceiling = list(leg_ceilings)
     for i in range(1, N):
-        fwd_hi[i] = min(leg_ceilings[i], fwd_hi[i - 1] + leg_max_d[i - 1])
+        forward_ceiling[i] = min(leg_ceilings[i], forward_ceiling[i - 1] + leg_max_d[i - 1])
+    logger.info("Step 4c — forward ceiling propagation: %d legs processed", N)
 
     # Backward ceiling: how high can we be at leg i and still meet future ceilings?
-    bwd_hi = list(leg_ceilings)
+    backward_ceiling = list(leg_ceilings)
     for i in range(N - 2, -1, -1):
-        bwd_hi[i] = min(leg_ceilings[i], bwd_hi[i + 1] + leg_max_d[i])
+        backward_ceiling[i] = min(leg_ceilings[i], backward_ceiling[i + 1] + leg_max_d[i])
+    logger.info("Step 4d — backward ceiling propagation: %d legs processed", N)
 
-    eff_lo = [max(fwd_lo[i], bwd_lo[i]) for i in range(N)]
-    eff_hi = [min(fwd_hi[i], bwd_hi[i]) for i in range(N)]
+    effective_floor = [max(forward_floor[i], backward_floor[i]) for i in range(N)]
+    effective_ceiling = [min(forward_ceiling[i], backward_ceiling[i]) for i in range(N)]
 
     for i in range(N):
-        if eff_lo[i] > eff_hi[i]:
+        if effective_floor[i] > effective_ceiling[i]:
             # Slope + AGL constraints are genuinely unsatisfiable (insufficient horizontal space).
             mid_pt = _midpoint(expanded_points[i], expanded_points[i + 1])
             violations.append(
@@ -461,24 +493,42 @@ def plan_altitude_profile(
                     location=mid_pt,
                     message=(
                         f"Slope + AGL constraints unsatisfiable on leg {i}: "
-                        f"eff_lo={eff_lo[i]:.1f} > eff_hi={eff_hi[i]:.1f}. "
+                        f"floor={effective_floor[i]:.1f} > ceiling={effective_ceiling[i]:.1f}. "
                         f"Insufficient horizontal distance for required altitude change."
                     ),
-                    measured_value=eff_lo[i],
-                    limit_value=eff_hi[i],
+                    measured_value=effective_floor[i],
+                    limit_value=effective_ceiling[i],
                 )
             )
-            eff_hi[i] = eff_lo[i]  # safety wins
+            effective_ceiling[i] = effective_floor[i]  # safety wins
 
     # ── Step 5: Select cruise altitude — simple forward clamp ─────────────────
     # Maintain altitude unless forced up by floor or down by ceiling.
-    # bwd_lo already baked in pre-climb requirements, so no look-ahead needed.
+    # backward_floor already baked in pre-climb requirements, so no look-ahead needed.
     leg_altitudes: list[float] = [0.0] * N
-    alt = max(start_alt, eff_lo[0])
+    alt = max(start_alt, effective_floor[0])
     for i in range(N):
-        alt = max(alt, eff_lo[i])  # climb if terrain floor forces it
-        alt = min(alt, eff_hi[i])  # descend if ceiling forces it
+        alt = max(alt, effective_floor[i])  # climb if terrain floor forces it
+        alt = min(alt, effective_ceiling[i])  # descend if ceiling forces it
         leg_altitudes[i] = alt
+
+    # ── Step 5b: Staircase suppression ────────────────────────────────────────
+    # With min_step_m > 0, quantise each leg altitude to the nearest multiple of
+    # min_step_m (rounded up so we never drop below the floor).  This collapses
+    # a sequence of small incremental steps into larger, rarer jumps — producing
+    # a smoother "staircase" profile without violating the floor or ceiling.
+    if params.min_step_m > 0:
+        step = params.min_step_m
+        for i in range(N):
+            quantised = math.ceil(leg_altitudes[i] / step) * step
+            leg_altitudes[i] = min(max(quantised, effective_floor[i]), effective_ceiling[i])
+
+    logger.info(
+        "Step 5 — altitude selection: %.1f–%.1f m MSL across %d legs",
+        min(leg_altitudes),
+        max(leg_altitudes),
+        N,
+    )
 
     # ── Step 6: Clamp start altitude ──────────────────────────────────────────
     # Ensure the drone's takeoff altitude clears the first leg's floor.
@@ -514,7 +564,7 @@ def plan_altitude_profile(
         ramp_dist = compute_ramp_distance_m(delta, params)
         prev_point = result_points[-1]
         this_point = expanded_points[i]
-        leg_len = _leg_length_m(prev_point, this_point)
+        leg_len = approx_distance_m(prev_point, this_point)
 
         if ramp_dist < leg_len - 0.1:
             # Normal: ramp fits within the current leg.
@@ -530,7 +580,7 @@ def plan_altitude_profile(
         else:
             # Ramp spans the full leg (rare after Step 4; only floating-point edge cases).
             actual_slope = abs(delta) / max(leg_len, 0.1)
-            if actual_slope > params.max_climb_slope * 1.02:
+            if actual_slope > params.max_climb_slope * _config.RAMP_SLOPE_TOLERANCE:
                 violations.append(
                     Violation(
                         tier=ViolationTier.HARD,
@@ -550,6 +600,13 @@ def plan_altitude_profile(
         result_altitudes.append(outgoing_alt)
         result_actions.append(action)
 
+    _n_ramp_segs = sum(1 for a in result_actions if a == "ramp_start")
+    logger.info(
+        "Step 7 — ramp insertion: %d ramp segments added (%d key waypoints total)",
+        _n_ramp_segs,
+        len(result_points),
+    )
+
     # ── Step 8: Ramp terrain pins ─────────────────────────────────────────────
     _insert_ramp_pins(
         result_points,
@@ -563,6 +620,13 @@ def plan_altitude_profile(
         point_radius_m=params.point_radius_m,
     )
 
+    _n_pins = sum(1 for a in result_actions if a == "ramp_pin")
+    logger.info(
+        "Step 8 — ramp terrain pins: %d pin waypoints inserted (%d key waypoints total)",
+        _n_pins,
+        len(result_points),
+    )
+
     # ── Step 9: Validate AGL (both min and max) along every segment ───────────
     for i in range(1, len(result_points)):
         seg_start = result_points[i - 1]
@@ -572,7 +636,7 @@ def plan_altitude_profile(
 
         mid = _midpoint(seg_start, seg_end)
         active_band = band_at(mid, poi_zones, global_band)
-        seg_len = _leg_length_m(seg_start, seg_end)
+        seg_len = approx_distance_m(seg_start, seg_end)
 
         if seg_len < 0.1:
             continue
@@ -592,7 +656,7 @@ def plan_altitude_profile(
                         location=sample_pt,
                         message=(
                             f"AGL {agl:.1f} m below minimum {active_band.min_agl_m:.1f} m "
-                            f"(segment {i - 1}→{i}, d={sample.distance_m:.1f} m)"
+                            f"(segment {i - 1}->{i}, d={sample.distance_m:.1f} m)"
                         ),
                         measured_value=agl,
                         limit_value=active_band.min_agl_m,
@@ -608,7 +672,7 @@ def plan_altitude_profile(
                         location=sample_pt,
                         message=(
                             f"AGL {agl:.1f} m above maximum {active_band.max_agl_m:.1f} m "
-                            f"(segment {i - 1}→{i}, d={sample.distance_m:.1f} m)"
+                            f"(segment {i - 1}->{i}, d={sample.distance_m:.1f} m)"
                         ),
                         measured_value=agl,
                         limit_value=active_band.max_agl_m,

@@ -92,7 +92,7 @@ def generate_warp_and_weft_pattern(
 
 
 def generate_lawnmower_polygon_pattern(
-    polygon_latlon: list,  # list[PointLatLon | LatLon]
+    polygon_latlon: list[PointLatLon | LatLon],
     sweep_spacing_m: float,
     zone_str: str,
     *,
@@ -153,7 +153,6 @@ def generate_lawnmower_polygon_pattern(
         )
     spacing = max(sweep_spacing_m, MIN_SWEEP_SPACING_M)
     min_e, max_e = float(poly_e.min()), float(poly_e.max())
-    _min_n, _max_n = float(poly_n.min()), float(poly_n.max())
 
     n_strips = max(1, math.ceil((max_e - min_e) / spacing))
     strip_xs = [min_e + spacing * (i + 0.5) for i in range(n_strips)]
@@ -275,11 +274,16 @@ def build_poi_zone(
     global_band: AltitudeBand,
     zone_str: str,
     poi_index: int,
+    entry_bearing_deg: float = 0.0,
 ) -> PoiZone:
     """Construct a PoiZone from a POIConfig.
 
     The zone boundary is the maneuver area polygon (custom polygon or bounding
     rectangle). The band resolves per-POI overrides against the global band.
+
+    entry_bearing_deg is used to rotate the bounding rectangle so it matches the
+    actual lawnmower sweep orientation. warp_weft is always axis-aligned (0°/90°)
+    so entry_bearing is ignored for that maneuver type.
     """
     m = poi_config.maneuver
 
@@ -288,13 +292,24 @@ def build_poi_zone(
     poi_max = m.poi_max_agl_m if m.poi_max_agl_m is not None else global_band.max_agl_m
     band = AltitudeBand(min_agl_m=poi_min, max_agl_m=poi_max)
 
+    center = LatLon(lat=poi_config.point.lat, lon=poi_config.point.lon)
+
     # Resolve boundary polygon
     if m.polygon:
         boundary = tuple(LatLon(lat=v.lat, lon=v.lon) for v in m.polygon)
-    else:
-        # Build a rectangle from center + width_m / height_m
+    elif m.type == "lawnmower":
+        # Rotate the bounding rectangle to match the lawnmower sweep direction.
+        # warp_weft generates two axis-aligned passes (0° and 90°) so no rotation needed.
         boundary = _rectangle_boundary(
-            center=LatLon(lat=poi_config.point.lat, lon=poi_config.point.lon),
+            center=center,
+            width_m=m.width_m,
+            height_m=m.height_m,
+            zone_str=zone_str,
+            entry_bearing_deg=entry_bearing_deg,
+        )
+    else:
+        boundary = _rectangle_boundary(
+            center=center,
             width_m=m.width_m,
             height_m=m.height_m,
             zone_str=zone_str,
@@ -312,15 +327,31 @@ def _rectangle_boundary(
     width_m: float,
     height_m: float,
     zone_str: str,
+    entry_bearing_deg: float = 0.0,
 ) -> tuple[LatLon, ...]:
-    """Return a 4-vertex LatLon polygon for a rectangle centred on center."""
+    """Return a 4-vertex LatLon polygon for a rectangle centred on center.
+
+    entry_bearing_deg rotates the rectangle using the same convention as
+    generate_lawnmower_pattern: width runs cross-track (perpendicular to bearing)
+    and height runs along-track (parallel to bearing).
+    """
     e0, n0, _ = latlon_to_utm(center.lat, center.lon)
     hw = width_m / 2.0
     hh = height_m / 2.0
+    bearing_rad = math.radians(entry_bearing_deg)
+    cos_b = math.cos(bearing_rad)
+    sin_b = math.sin(bearing_rad)
+
+    def _rotate(e_local: float, n_local: float) -> tuple[float, float]:
+        return (
+            e0 + e_local * cos_b - n_local * sin_b,
+            n0 + e_local * sin_b + n_local * cos_b,
+        )
+
     corners_utm = [
-        (e0 - hw, n0 - hh),
-        (e0 + hw, n0 - hh),
-        (e0 + hw, n0 + hh),
-        (e0 - hw, n0 + hh),
+        _rotate(-hw, -hh),
+        _rotate(+hw, -hh),
+        _rotate(+hw, +hh),
+        _rotate(-hw, +hh),
     ]
     return tuple(utm_to_latlon_obj(e, n, zone_str) for e, n in corners_utm)

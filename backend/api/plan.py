@@ -12,22 +12,28 @@ This module is a thin adapter:
 
 from __future__ import annotations
 
+import asyncio
+import contextvars
 import hashlib
 import io
 import json
 import logging
 import re
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import rasterio
 
 import numpy as np
 import utm as _utm_lib
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from scipy.spatial import KDTree
 
 import config
 import session as session_store
-from core.battery import cumulative_energy_wh
+from core.battery import estimate_flight
 from core.poi import (
     build_poi_zone,
     compute_entry_bearing,
@@ -73,15 +79,101 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+# ── SSE progress streaming ─────────────────────────────────────────────────────
+
+# Per-request context: (queue, event_loop) written by the async endpoint,
+# read by _ProgressHandler running inside the thread-pool worker.
+_progress_ctx_var: contextvars.ContextVar[
+    tuple["asyncio.Queue[dict | None]", asyncio.AbstractEventLoop] | None
+] = contextvars.ContextVar("_progress_ctx_var", default=None)
+
+# Phase name for each PLAN_STEPS index (must mirror usePlanRoute.ts PLAN_STEPS)
+_STEP_PHASES = [
+    "terrain", "terrain", "terrain",
+    "route", "route", "route", "route",
+    "altitude", "altitude", "altitude", "altitude", "altitude",
+    "altitude", "altitude", "altitude",
+    "safety", "safety", "safety",
+    "packaging", "packaging", "packaging", "packaging",
+]
+
+# Maps (logger-name-suffix, message-prefix) → PLAN_STEPS index
+_STEP_MAP: list[tuple[str, str, int]] = [
+    ("plan",     "Opening raster",           0),
+    ("terrain",  "Reprojecting CRS",          1),
+    ("terrain",  "Building terrain",         2),
+    ("plan",     "Tracing transit legs",     3),
+    ("plan",     "Generating maneuver",      4),
+    ("altitude", "Step 2a",                  5),
+    ("altitude", "Step 2b",                  6),
+    ("altitude", "Step 3",                   7),
+    ("altitude", "Step 4a",                  8),
+    ("altitude", "Step 4b",                  9),
+    ("altitude", "Step 4c",                 10),
+    ("altitude", "Step 4d",                 11),
+    ("altitude", "Step 5",                  12),
+    ("altitude", "Step 7",                  13),
+    ("altitude", "Step 8",                  14),
+    ("safety",   "Checking vertical",       15),
+    ("safety",   "Verifying safety bubble", 16),
+    ("safety",   "Checking camera",         17),
+    ("route",    "Densifying",              18),
+    ("plan",     "Writing waypoints",       19),
+    ("plan",     "Generating mission_log",  20),
+    ("plan",     "Assembling ZIP",          21),
+]
+
+
+class _ProgressHandler(logging.Handler):
+    """Routes matching log records to the per-request SSE queue (no-op outside plan requests)."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        ctx = _progress_ctx_var.get(None)
+        if ctx is None:
+            return
+        suffix = record.name.split(".")[-1]
+        msg = record.getMessage()
+        for name_suffix, prefix, step_idx in _STEP_MAP:
+            if suffix == name_suffix and msg.startswith(prefix):
+                queue, loop = ctx
+                event = {"step": step_idx, "phase": _STEP_PHASES[step_idx], "msg": msg}
+                loop.call_soon_threadsafe(queue.put_nowait, event)
+                return
+
+
+# Installed once at import time — no-ops unless a plan request is active.
+logging.getLogger().addHandler(_ProgressHandler())
+
 
 def _zip_filename(mission_name: str) -> str:
     slug = re.sub(r"[^\w\-]", "_", (mission_name or "mission").strip())[:40].strip("_") or "mission"
     return f"{slug}_{date.today().strftime('%Y%m%d')}.zip"
 
 
-@router.post("/plan")
-async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
-    """Compute an optimised terrain-following route and return a ZIP file."""
+def _post_progress_sentinel() -> None:
+    """Post the None sentinel to the SSE queue so the async generator can stop."""
+    ctx = _progress_ctx_var.get(None)
+    if ctx is not None:
+        queue, loop = ctx
+        loop.call_soon_threadsafe(queue.put_nowait, None)
+
+
+def _post_step(step_idx: int) -> None:
+    """Post a progress step event to the SSE queue directly from the planning thread."""
+    ctx = _progress_ctx_var.get(None)
+    if ctx is None:
+        return
+    queue, loop = ctx
+    event = {"step": step_idx, "phase": _STEP_PHASES[step_idx]}
+    loop.call_soon_threadsafe(queue.put_nowait, event)
+
+
+def _run_planning_sync(req: RouteRequest) -> tuple[bytes, "PlanMeta"]:
+    """Synchronous planning worker — runs in a thread pool via run_in_executor.
+
+    Returns (user_zip_bytes, meta). Always posts a None sentinel to the SSE queue
+    so the async generator knows when to stop waiting.
+    """
     logger.info(
         "Planning route: %d POIs, %d waypoints, smart_route=%s",
         len(req.pois),
@@ -92,10 +184,12 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
     # ── 1. Load session ────────────────────────────────────────────────────────
     sess = session_store.get_session(req.session_id)
     if sess is None:
+        _post_progress_sentinel()
         raise HTTPException(
             status_code=404, detail=f"Session {req.session_id!r} not found or expired"
         )
     if not sess.files:
+        _post_progress_sentinel()
         raise HTTPException(status_code=400, detail="Session contains no uploaded terrain files")
 
     datasets = {name: sf.dataset for name, sf in sess.files.items()}
@@ -112,8 +206,17 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 break
 
         # ── 3. Build TerrainIndex objects ─────────────────────────────────────
-        dsm_index = build_terrain_index(dsm_ds)
-        dtm_index = build_terrain_index(dtm_ds) if dtm_ds is not dsm_ds else dsm_index
+        _post_step(0)   # "Opening raster tiles from session store"
+        dsm_index = build_terrain_index(
+            dsm_ds,
+            on_reproject=lambda: _post_step(1),
+            on_interpolate=lambda: _post_step(2),
+        )
+        dtm_index = (
+            build_terrain_index(dtm_ds, on_reproject=lambda: _post_step(1), on_interpolate=lambda: _post_step(2))
+            if dtm_ds is not dsm_ds
+            else dsm_index
+        )
 
         zone_str = dtm_index.zone_str
 
@@ -147,6 +250,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         global_band = AltitudeBand(min_agl_m=params.min_agl_m, max_agl_m=params.max_agl_m)
 
         # ── 6. Resolve POI order ───────────────────────────────────────────────
+        logger.info("Tracing transit legs between waypoints: %d waypoints", len(req.waypoints))
         if fc.optimize_poi_order and len(req.pois) > 2:
             pois_to_plan = _reorder_pois_tsp(req.pois, req.start.lat, req.start.lon)
             logger.info("POI order optimised (nearest-neighbor TSP)")
@@ -162,11 +266,10 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         prev_point = LatLon(lat=req.start.lat, lon=req.start.lon)
 
         for poi_idx, poi in enumerate(pois_to_plan):
-            zone = build_poi_zone(poi, global_band, zone_str, poi_idx)
-            poi_zones.append(zone)
-
             poi_center = LatLon(lat=poi.point.lat, lon=poi.point.lon)
             entry_bearing = compute_entry_bearing(prev_point, poi_center)
+            zone = build_poi_zone(poi, global_band, zone_str, poi_idx, entry_bearing_deg=entry_bearing)
+            poi_zones.append(zone)
             pattern = _expand_maneuver_latlon(
                 poi,
                 zone_str,
@@ -194,6 +297,8 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 prev_point = pattern[-1]
             else:
                 prev_point = poi_center
+
+        logger.info("Generating maneuver sweeps for %d POIs", len(pois_to_plan))
 
         # ── 8. Assemble MissionInput and call plan_route ───────────────────────
         bubble_terrain = _pick_terrain(fc.safety_radius_terrain, dsm_index, dtm_index)
@@ -341,6 +446,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         headings = compute_headings(dense_utm)
 
         # ── 14. Waypoints JSON ────────────────────────────────────────────────
+        logger.info("Writing waypoints.json: %d dense waypoints", n_dense)
         waypoints_json = to_waypoints_json(
             dense_utm,
             final_alts,
@@ -405,7 +511,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 20. Cumulative energy for profile ─────────────────────────────────
-        cum_energy = cumulative_energy_wh(dense_utm, final_alts, params)
+        cum_energy = estimate_flight(dense_utm, final_alts, params).cumulative_wh
 
         bubble_peak_terrain, camera_min_terrain = compute_profile_bands(
             dense_utm, terrain_elevs, bubble_terrain, camera_terrain, params
@@ -452,6 +558,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 23. Mission log ────────────────────────────────────────────────────
+        logger.info("Generating mission_log.txt")
         route_hash = hashlib.sha256(
             json.dumps(req.model_dump(), default=str, sort_keys=True).encode()
         ).hexdigest()[:16]
@@ -480,6 +587,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 23. Package ZIP ────────────────────────────────────────────────────
+        logger.info("Assembling ZIP archive")
         kml_str = render_kml(waypoints_json)
         poi_bands_json_str: str | None = None
         if poi_band_overrides:
@@ -581,19 +689,97 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         # Strip internal editor files before sending to the user.
         # meta.json is already embedded in zip_buf by build_zip().
         user_zip_bytes = strip_internal_files(zip_buf.getvalue())
-        return StreamingResponse(
-            iter([user_zip_bytes]),
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{_zip_filename(req.name)}"',
-            },
-        )
+        return user_zip_bytes, meta
 
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Planning failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Planning error: {exc}") from exc
+    finally:
+        _post_progress_sentinel()
+
+
+async def _plan_sse_stream(
+    req: RouteRequest,
+    queue: asyncio.Queue,
+    loop: asyncio.AbstractEventLoop,
+):
+    """Async generator that drives the planning thread and yields SSE events.
+
+    The planning work runs in a thread-pool executor (via run_in_executor) so it
+    can do blocking I/O without stalling the event loop.
+
+    run_in_executor does NOT copy the caller's contextvars to the new thread, so we
+    must do it explicitly: copy_context() snapshots the current Context (which already
+    has _progress_ctx_var set), then pass ctx.run as the callable so the thread runs
+    inside that snapshot and can read _progress_ctx_var.
+
+    The planning thread emits progress via loop.call_soon_threadsafe → queue, and posts
+    a None sentinel when it finishes.  We drain the queue here and yield each event as
+    an SSE frame.
+    """
+    # token + reset must happen in the same Context object, so set the var here
+    # (not in the outer endpoint function) before copy_context().
+    token = _progress_ctx_var.set((queue, loop))
+    try:
+        planning_ctx = contextvars.copy_context()
+        planning_task = loop.run_in_executor(None, planning_ctx.run, _run_planning_sync, req)
+
+        # Drain progress events until the planning thread posts the None sentinel.
+        # asyncio.sleep(0) after each yield gives the event loop one iteration to
+        # flush the TCP write buffer before the next event, so each SSE frame is
+        # sent as its own packet rather than all being batched into one.
+        while True:
+            event = await queue.get()
+            if event is None:
+                break
+            yield f"data: {json.dumps(event)}\n\n"
+            await asyncio.sleep(0.05)  # give uvicorn time to flush each event as its own TCP packet
+
+        # Await the result; any exception raised in the thread is re-raised here.
+        _zip_bytes, meta = await planning_task
+        yield f"data: {json.dumps({'done': True, 'meta': json.loads(meta.model_dump_json())})}\n\n"
+    except HTTPException as exc:
+        yield f"data: {json.dumps({'error': exc.detail})}\n\n"
+    except Exception as exc:
+        yield f"data: {json.dumps({'error': str(exc)})}\n\n"
+    finally:
+        _progress_ctx_var.reset(token)
+
+
+@router.post("/plan")
+async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
+    """Stream planning progress as SSE, then signal completion with plan metadata."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    return StreamingResponse(
+        _plan_sse_stream(req, queue, loop),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # disables nginx proxy buffering
+        },
+    )
+
+
+@router.get("/plan/result")
+async def plan_result_endpoint(session_id: str) -> Response:
+    """Return the user ZIP from the most recent plan in this session."""
+    sess = session_store.get_session(session_id)
+    if sess is None or sess.last_plan is None or sess.last_plan.zip_bytes is None:
+        raise HTTPException(404, "No plan result available for this session")
+    user_zip_bytes = strip_internal_files(sess.last_plan.zip_bytes)
+    return Response(
+        content=user_zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{_zip_filename(sess.last_plan.mission_name)}"'
+            ),
+            "X-Plan-Meta": json.dumps(json.loads(sess.last_plan.meta.model_dump_json()), ensure_ascii=True),
+        },
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -622,7 +808,7 @@ def _violation_to_info(v: Violation, point_index: int, category: str) -> Violati
 def _resolve_dsm_dtm(
     datasets: dict,
     file_infos: dict,
-) -> tuple:
+) -> tuple[rasterio.DatasetReader, rasterio.DatasetReader]:
     """Pick DSM and DTM datasets from the session files."""
     file_list = list(datasets.items())
     if len(file_list) == 1:

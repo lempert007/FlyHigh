@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import base64
 
+from export.html_utils import srcdoc_escape
+
 
 def render_combined_html(
     map_html: str,
@@ -24,10 +26,6 @@ def render_combined_html(
     Returns:
         Complete HTML string.
     """
-
-    def srcdoc_escape(html: str) -> str:
-        """Escape HTML for use in a srcdoc attribute (double-quoted)."""
-        return html.replace("&", "&amp;").replace('"', "&quot;")
 
     def b64(html: str) -> str:
         return base64.b64encode(html.encode("utf-8")).decode("ascii")

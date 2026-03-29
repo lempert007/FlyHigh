@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 
+import config as _config
+
 # ── Colour palette ──────────────────────────────────────────────────────────
 _BG = "#0d1117"
 _GRID = "#21262d"
@@ -25,9 +27,9 @@ _TEXT = "#c9d1d9"
 _TEXT_DIM = "#8b949e"
 _ACCENT = "#1E90FF"
 
-# AGL clearance colour thresholds (metres)
-_AGL_GOOD = 15.0  # above this → green
-_AGL_WARN = 5.0  # above this → amber; below → red
+# AGL clearance colour thresholds — defined in config.py
+_AGL_GOOD = _config.AGL_PROFILE_GOOD_M
+_AGL_WARN = _config.AGL_PROFILE_WARN_M
 
 _AGL_CMAP = LinearSegmentedColormap.from_list("agl", ["#ff5252", "#ff9100", "#00e676"], N=256)
 

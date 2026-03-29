@@ -136,7 +136,6 @@ export function buildNodes(
   for (let i = 1; i < wps.length; i++) {
     const action = wps[i].action;
     const prevWasPoi = POI_ACTIONS.has(prevAction);
-    const _currIsPoi = POI_ACTIONS.has(action);
     const prevWasWaypoint = prevAction === "waypoint";
     const currIsWaypoint = action === "waypoint";
 

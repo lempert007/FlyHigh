@@ -110,6 +110,7 @@ def check_route_safety(
     alts = np.array([w.alt_msl for w in waypoints])
 
     # ── 1. Vertical clearance ─────────────────────────────────────────────────
+    logger.info("Checking vertical surface clearance: %d waypoints", len(waypoints))
     vert_elevs = vertical_terrain.sample_points(utm_points)
     vertical_violation = np.where(
         np.isnan(vert_elevs), False, alts < vert_elevs - config.AGL_VALIDATION_EPSILON_M
@@ -134,6 +135,7 @@ def check_route_safety(
     # ── 2. Horizontal safety bubble — disc sample (vectorised) ───────────────
     # Sample the full disc (center + K concentric rings) and require that the
     # drone is at least min_agl_m above the highest terrain in that disc.
+    logger.info("Verifying safety bubble disc compliance: %d waypoints", len(waypoints))
     n_pts = len(waypoints)
     n_az = config.BUBBLE_SAMPLE_COUNT
     radius = params.point_radius_m
@@ -164,6 +166,7 @@ def check_route_safety(
         )
 
     # ── 3. Camera range — HARD check (max_surface_radius_m) ──────────────────
+    logger.info("Checking camera AGL band compliance")
     cam_radius = params.max_surface_radius_m
     if cam_radius > 0:
         cam_ring_e = utm_points[:, 0:1] + cam_radius * np.cos(angles)

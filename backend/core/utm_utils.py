@@ -50,6 +50,17 @@ def utm_to_latlon_obj(easting: float, northing: float, zone_str: str) -> LatLon:
     return LatLon(lat=lat, lon=lon)
 
 
+def approx_distance_m(p1: LatLon, p2: LatLon) -> float:
+    """Fast flat-earth approximation of distance in metres between two LatLon points.
+
+    Accurate to ~0.1 % for distances under 100 km. Used where sub-metre precision
+    is not required (band-crossing search, leg-length for slope constraints).
+    """
+    lat_m = 111_320.0
+    lon_m = 111_320.0 * math.cos(math.radians((p1.lat + p2.lat) / 2))
+    return math.hypot((p2.lat - p1.lat) * lat_m, (p2.lon - p1.lon) * lon_m)
+
+
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     """Great-circle distance in metres between two WGS-84 points."""
     R = 6_371_000.0

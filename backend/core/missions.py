@@ -102,7 +102,7 @@ def list_missions() -> list[dict]:
                     "route_preview": {"start": start, "waypoints": wps, "pois": pois},
                 }
             )
-        except Exception:
+        except (OSError, json.JSONDecodeError, KeyError, ValueError):
             logger.warning("Failed to read mission %r — skipping", entry)
 
     results.sort(key=lambda m: m.get("updated_at", ""), reverse=True)

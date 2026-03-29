@@ -46,11 +46,17 @@ GRAVITY_MS2: float = 9.81
 AIR_DENSITY_KGM3: float = 1.225
 """International Standard Atmosphere sea-level air density in kg/m³."""
 
-HOVER_EFFICIENCY: float = 0.70
-"""Combined motor + propeller efficiency factor for horizontal flight power model."""
+HOVER_POWER_SCALE_W: float = 75.0
+"""Scale factor for hover power: P_hover = HOVER_POWER_SCALE_W * weight_kg^1.5.
+Units: W / kg^1.5. Calibrated from small–medium camera drones (0.9–5 kg).
+DJI Mavic class (~0.9 kg): ~64 W hover; 3 kg survey drone: ~390 W hover."""
 
-POWER_COEFF: float = 1.5
-"""Exponent in horizontal power model: P_horiz ∝ weight_kg^POWER_COEFF."""
+PROFILE_POWER_FRACTION: float = 0.10
+"""Blade profile drag as a fraction of hover power (typically 8–12%)."""
+
+PARASITE_DRAG_COEFF: float = 0.022
+"""Effective body drag area Cd×A in m². Used as 0.5*rho*Cd*A*v^3 for parasite power.
+Calibrated for a typical 1–3 kg drone frontal silhouette."""
 
 # ── Terrain interpolation ─────────────────────────────────────────────────────
 NODATA_FILL: float = float("nan")
@@ -111,6 +117,13 @@ queries per route point."""
 BATTERY_WARNING_PCT: float = 90.0
 """Budget percentage above which an amber warning is surfaced."""
 
+# ── AGL profile chart thresholds ──────────────────────────────────────────────
+AGL_PROFILE_GOOD_M: float = 15.0
+"""AGL clearance above which the profile chart colours a point green."""
+
+AGL_PROFILE_WARN_M: float = 5.0
+"""AGL clearance below which the profile chart colours a point red (amber between warn and good)."""
+
 BATTERY_ERROR_PCT: float = 100.0
 """Budget percentage above which a red error is surfaced (route still returned)."""
 
@@ -131,6 +144,10 @@ CAMERA_RANGE_EPSILON_M: float = 1.0
 """Tolerance (metres) for the camera-range check. Being up to 1 m above max_agl_m
 is acceptable — the check is a product-quality concern, not a crash risk."""
 
+RAMP_SLOPE_TOLERANCE: float = 1.02
+"""Multiplier applied to max_climb_slope before raising a slope violation.
+A 2% margin absorbs floating-point rounding so near-exact ramps don't warn."""
+
 
 def _validate() -> None:
     """Assert invariants on constants at import time to catch misconfiguration early."""
@@ -144,7 +161,9 @@ def _validate() -> None:
     assert DEFAULT_CLIMB_RATE_MS > 0, "DEFAULT_CLIMB_RATE_MS must be positive"
     assert DEFAULT_BATTERY_WH > 0, "DEFAULT_BATTERY_WH must be positive"
     assert DEFAULT_DRONE_WEIGHT_KG > 0, "DEFAULT_DRONE_WEIGHT_KG must be positive"
-    assert 0 < HOVER_EFFICIENCY <= 1, "HOVER_EFFICIENCY must be in (0, 1]"
+    assert HOVER_POWER_SCALE_W > 0, "HOVER_POWER_SCALE_W must be positive"
+    assert 0 < PROFILE_POWER_FRACTION < 1, "PROFILE_POWER_FRACTION must be in (0, 1)"
+    assert PARASITE_DRAG_COEFF > 0, "PARASITE_DRAG_COEFF must be positive"
     assert SMART_ROUTE_CORRIDOR_M > 0, "SMART_ROUTE_CORRIDOR_M must be positive"
     assert SESSION_TTL_SECONDS > 0, "SESSION_TTL_SECONDS must be positive"
 

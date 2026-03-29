@@ -8,6 +8,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 import config
+from export.html_utils import inject_dark_fullscreen_css
 from models import FlightConfig
 
 
@@ -267,11 +268,5 @@ def render_profile_html(
         autosize=True,
     )
 
-    html = fig.to_html(full_html=True, include_plotlyjs="cdn", config={"responsive": True})
-    css = (
-        "<style>"
-        "html,body{margin:0;padding:0;height:100%;background:#111;overflow:hidden;}"
-        ".plotly-graph-div{height:100vh!important;width:100vw!important;}"
-        "</style>"
-    )
-    return html.replace("</head>", css + "</head>", 1)
+    html_str = fig.to_html(full_html=True, include_plotlyjs="cdn", config={"responsive": True})
+    return inject_dark_fullscreen_css(html_str)

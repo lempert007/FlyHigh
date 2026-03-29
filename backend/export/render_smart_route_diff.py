@@ -6,12 +6,14 @@ Both panels are embedded in a single self-contained HTML page.
 
 from __future__ import annotations
 
+import html as _html
 import folium
 import numpy as np
 import plotly.graph_objects as go
 
 from core.route import compute_cumulative_distances
 from core.utm_utils import utm_to_latlon
+from export.html_utils import srcdoc_escape
 
 
 def render_smart_route_diff_html(
@@ -166,12 +168,9 @@ def render_smart_route_diff_html(
 
     chart_html = fig.to_html(full_html=True, include_plotlyjs=True)
 
-    def srcdoc_escape(html: str) -> str:
-        return html.replace("&", "&amp;").replace('"', "&quot;")
-
     map_srcdoc = srcdoc_escape(map_html)
     chart_srcdoc = srcdoc_escape(chart_html)
-    summary_escaped = summary.replace("<", "&lt;").replace(">", "&gt;")
+    summary_escaped = _html.escape(summary)
 
     return f"""<!DOCTYPE html>
 <html>

@@ -7,7 +7,9 @@ All rasters are 64×64 pixels, WGS-84 EPSG:4326, centred at lat=32.0 lon=34.8.
 
 import io
 import json
+import os
 import sys
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -22,6 +24,7 @@ from rasterio.transform import from_bounds
 # Make the backend package importable from the tests subdirectory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from main import app  # noqa: E402
+import config  # noqa: E402
 
 # ── Raster geography ─────────────────────────────────────────────────────────
 
@@ -96,32 +99,56 @@ async def client():
         yield c
 
 
+# ── TIFF library cleanup fixture ─────────────────────────────────────────────
+
+@pytest.fixture(autouse=True)
+def cleanup_test_tiffs():
+    """Remove any _test_*.tif files written to the TIFF library during the test."""
+    yield
+    for name in os.listdir(config.TIFF_LIBRARY_PATH):
+        if name.startswith("_test_"):
+            try:
+                os.unlink(os.path.join(config.TIFF_LIBRARY_PATH, name))
+            except OSError:
+                pass
+
+
 # ── Helpers (plain functions, not fixtures) ───────────────────────────────────
 
-async def upload(client, *tiffs: tuple[str, bytes]) -> tuple[str, list[str]]:
+async def upload(
+    client,
+    *args: tuple[str, bytes] | dict[str, str],
+) -> tuple[str, list[str]]:
     """
-    Upload one or more (filename, bytes) pairs.  Returns (session_id, [filenames]).
-    file_types defaults to empty — the backend infers DSM/DTM from the filename.
-    Pass explicit file_types as the last positional arg if needed.
+    Write TIFF bytes to the server-side library, activate them into a new session.
+    Returns (session_id, [filenames]).
+
+    Accepts (name, bytes) tuples. An optional trailing dict maps original names to
+    explicit file types (e.g. ``{"dtm.tif": "DTM", "dsm.tif": "DSM"}``).
+
+    Files are written with a unique _test_ prefix so cleanup_test_tiffs removes them
+    after each test without touching real library files.
     """
     file_types: dict[str, str] = {}
-    # Allow caller to pass file_types as a trailing dict
-    real_tiffs = []
-    for item in tiffs:
-        if isinstance(item, dict):
-            file_types = item
+    tiff_pairs: list[tuple[str, bytes]] = []
+    for arg in args:
+        if isinstance(arg, dict):
+            file_types = arg
         else:
-            real_tiffs.append(item)
+            tiff_pairs.append(arg)  # type: ignore[arg-type]
 
-    files = [("files", (name, data, "image/tiff")) for name, data in real_tiffs]
-    resp = await client.post(
-        "/upload",
-        files=files,
-        data={"file_types": json.dumps(file_types)},
-    )
+    selections = []
+    for name, data in tiff_pairs:
+        unique_name = f"_test_{uuid.uuid4().hex[:8]}_{name}"
+        dest = os.path.join(config.TIFF_LIBRARY_PATH, unique_name)
+        with open(dest, "wb") as f:
+            f.write(data)
+        selections.append({"name": unique_name, "type": file_types.get(name, "DSM")})
+
+    resp = await client.post("/upload", json={"selections": selections})
     assert resp.status_code == 200, f"Upload failed: {resp.text}"
-    data = resp.json()
-    return data["session_id"], [f["name"] for f in data["files"]]
+    result = resp.json()
+    return result["session_id"], [f["name"] for f in result["files"]]
 
 
 def make_request(
@@ -183,15 +210,33 @@ def make_request(
 
 async def plan(client, request: dict) -> tuple[dict, list[dict]]:
     """
-    POST /plan, assert 200, return (meta_dict, waypoints_list).
-    meta comes from the X-Plan-Meta header; waypoints from the ZIP.
+    POST /plan (SSE stream), consume events until done, then GET /plan/result for ZIP.
+    Returns (meta_dict, waypoints_list).
     """
+    session_id = request.get("session_id", "")
+
+    # POST /plan — returns text/event-stream
     resp = await client.post("/plan", json=request)
-    assert resp.status_code == 200, f"Plan failed: {resp.text[:500]}"
+    assert resp.status_code == 200, f"Plan failed (status {resp.status_code}): {resp.text[:500]}"
 
-    meta = json.loads(resp.headers["X-Plan-Meta"])
+    meta: dict | None = None
+    for line in resp.text.split("\n"):
+        if not line.startswith("data: "):
+            continue
+        event: dict = json.loads(line[6:])
+        if event.get("error"):
+            raise AssertionError(f"Plan returned error: {event['error']}")
+        if event.get("done"):
+            meta = event.get("meta") or {}
+            break
 
-    zf = zipfile.ZipFile(io.BytesIO(resp.content))
+    assert meta is not None, "SSE stream ended without a {done: true} event"
+
+    # GET /plan/result — returns the ZIP
+    result_resp = await client.get(f"/plan/result?session_id={session_id}")
+    assert result_resp.status_code == 200, f"plan/result failed: {result_resp.status_code}"
+
+    zf = zipfile.ZipFile(io.BytesIO(result_resp.content))
     waypoints = json.loads(zf.read("waypoints.json"))
 
     return meta, waypoints
