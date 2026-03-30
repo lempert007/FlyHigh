@@ -1,12 +1,10 @@
 """
 Combine the Folium map, 3D terrain chart, and AGL profile into a single
-tabbed HTML page.  Each panel is embedded as a base64 data-URI iframe so
-the output is fully self-contained.
+tabbed HTML page.  Each panel is embedded as a srcdoc iframe so the output
+is fully self-contained and works when opened as a blob URL in Chrome.
 """
 
 from __future__ import annotations
-
-import base64
 
 from export.html_utils import srcdoc_escape
 
@@ -27,35 +25,29 @@ def render_combined_html(
         Complete HTML string.
     """
 
-    def b64(html: str) -> str:
-        return base64.b64encode(html.encode("utf-8")).decode("ascii")
-
+    # All tabs use srcdoc — data: URI iframes are blocked by Chrome when the
+    # parent page is opened as a blob URL (URL.createObjectURL).
     tabs = [
-        # map uses srcdoc so Leaflet gets a proper origin and can load tiles/scripts
-        ("map", "2D Map", None, srcdoc_escape(map_html)),
-        ("terrain", "3D Terrain", b64(chart_3d_html), None),
-        ("profile", "Altitude Profile", b64(profile_html), None),
+        ("map", "2D Map", srcdoc_escape(map_html)),
+        ("terrain", "3D Terrain", srcdoc_escape(chart_3d_html)),
+        ("profile", "Altitude Profile", srcdoc_escape(profile_html)),
     ]
     if smart_route_diff_html is not None:
-        # srcdoc (not data: URI) so nested iframes inside the diff page
-        # get a proper browsing context — same reason the map uses srcdoc.
-        tabs.append(("smartroute", "Smart Route Diff", None, srcdoc_escape(smart_route_diff_html)))
+        tabs.append(("smartroute", "Smart Route Diff", srcdoc_escape(smart_route_diff_html)))
 
     buttons = "\n  ".join(
         f'<button class="tab{" active" if i == 0 else ""}" data-target="{tid}">{label}</button>'
-        for i, (tid, label, _, __) in enumerate(tabs)
+        for i, (tid, label, _) in enumerate(tabs)
     )
 
-    def iframe_tag(i, tid, b64_data, srcdoc_data):
+    def iframe_tag(i, tid, srcdoc_data):
         display = "block" if i == 0 else "none"
         style = f'style="display:{display};width:100%;height:calc(100vh - 52px);border:none;"'
-        if srcdoc_data is not None:
-            return f'<iframe id="{tid}" srcdoc="{srcdoc_data}" {style}></iframe>'
-        return f'<iframe id="{tid}" src="data:text/html;base64,{b64_data}" {style}></iframe>'
+        return f'<iframe id="{tid}" srcdoc="{srcdoc_data}" {style}></iframe>'
 
     iframes = "\n".join(
-        iframe_tag(i, tid, b64_data, srcdoc_data)
-        for i, (tid, _, b64_data, srcdoc_data) in enumerate(tabs)
+        iframe_tag(i, tid, srcdoc_data)
+        for i, (tid, _, srcdoc_data) in enumerate(tabs)
     )
 
     return f"""<!DOCTYPE html>
