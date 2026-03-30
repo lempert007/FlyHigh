@@ -307,10 +307,15 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
     )
 
     logger.info("Reprojecting CRS -> UTM coordinate frame")
+    # Read the source band into memory before warping.
+    # Passing rasterio.band() directly lets GDAL mmap tiles on-demand during
+    # the warp, which fails on WSL2 (TIFFReadEncodedTile errors via 9P FS).
+    # Pre-loading into a numpy array avoids all mid-warp disk access.
+    source_data = ds.read(1).astype(np.float64)
     destination = np.empty((height, width), dtype=np.float64)
     nodata_val = ds.nodata if ds.nodata is not None else config.NODATA_FILL
     rasterio.warp.reproject(
-        source=rasterio.band(ds, 1),
+        source=source_data,
         destination=destination,
         src_transform=ds.transform,
         src_crs=src_crs,
