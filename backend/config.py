@@ -163,6 +163,26 @@ RAMP_SLOPE_TOLERANCE: float = 1.02
 """Multiplier applied to max_climb_slope before raising a slope violation.
 A 2% margin absorbs floating-point rounding so near-exact ramps don't warn."""
 
+# ── Terrain leg splitting ──────────────────────────────────────────────────────
+SPLIT_MAX_DEPTH: int = 3
+"""Maximum recursion depth for the impossible-band leg splitter (Step 2b).
+Each level halves the leg; at depth 3 an 80 m leg becomes 10 m half-segments.
+Increase for smoother profiles on very rugged terrain at the cost of more waypoints."""
+
+SPLIT_MIN_LEG_M: float = 5.0
+"""Minimum leg length (metres) below which Step 2b stops recursing.
+Prevents degenerate sub-metre waypoints on cliff-edge or quarry-wall terrain
+where terrain variation can never be satisfied regardless of how small the leg is."""
+
+# ── RTH battery reserve ────────────────────────────────────────────────────────
+RTH_ENERGY_MARGIN: float = 1.15
+"""Safety multiplier applied to the estimated emergency RTH energy.
+A 15% buffer accounts for headwind and battery degradation on the return leg."""
+
+RTH_WARNING_THRESHOLD_PCT: float = 20.0
+"""Warn if the emergency RTH reserve alone exceeds this percentage of total battery.
+Above 20% the mission leaves limited abort margin — operator should consider range."""
+
 
 def _validate() -> None:
     """Assert invariants on constants at import time to catch misconfiguration early."""

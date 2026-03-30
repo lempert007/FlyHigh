@@ -16,6 +16,7 @@ interface SidebarShellProps {
   onTabChange: (tab: number) => void;
   onTourStart?: () => void;
   tourActive?: boolean;
+  width: number;
 }
 
 function BadgeDot({ badge }: { badge: TabBadge }) {
@@ -46,18 +47,19 @@ function BadgeDot({ badge }: { badge: TabBadge }) {
   );
 }
 
-/** 800 px fixed-width sidebar with tabbed panels. */
+/** Resizable sidebar with tabbed panels. Width is controlled by the parent. */
 export function SidebarShell({
   tabs,
   activeTab,
   onTabChange,
   onTourStart,
   tourActive,
+  width,
 }: SidebarShellProps) {
   return (
     <Box
       sx={{
-        width: 800,
+        width,
         flexShrink: 0,
         bgcolor: "#0d1117",
         borderRight: "1px solid #21262d",
@@ -119,6 +121,17 @@ export function SidebarShell({
             flexDirection: "column",
             p: 1.5,
             gap: 1.5,
+            // Slim, on-theme scrollbar (Chromium + Safari)
+            "&::-webkit-scrollbar": { width: 5 },
+            "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: "#30363d",
+              borderRadius: "3px",
+            },
+            "&::-webkit-scrollbar-thumb:hover": { bgcolor: "#444c56" },
+            // Firefox
+            scrollbarWidth: "thin",
+            scrollbarColor: "#30363d transparent",
           }}
         >
           {activeTab === i && tab.content}
