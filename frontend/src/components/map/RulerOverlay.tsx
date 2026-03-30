@@ -1,12 +1,17 @@
 import React from "react";
 import { Marker, Polyline, useMapEvents } from "react-leaflet";
 import L from "leaflet";
-import { haversineM, formatDist } from "../../utils/math";
+import { haversineM, bearingDeg, formatDist } from "../../utils/math";
 import { makeDistanceIcon } from "./icons";
 
 interface RulerOverlayProps {
   points: [number, number][];
   cursor: [number, number] | null;
+}
+
+function rulerLabel(a: [number, number], b: [number, number], dist: number): string {
+  const az = bearingDeg(a, b);
+  return `${formatDist(dist)}  ${az.toFixed(1)}°`;
 }
 
 /** Ruler: persistent polyline + distance badges between measured points. */
@@ -51,7 +56,7 @@ export function RulerOverlay({ points, cursor }: RulerOverlayProps): React.React
           <Polyline positions={[s.a, s.b]} color="#FF9800" weight={2} opacity={0.9} />
           <Marker
             position={s.mid}
-            icon={makeDistanceIcon(formatDist(s.dist))}
+            icon={makeDistanceIcon(rulerLabel(s.a, s.b, s.dist))}
             interactive={false}
           />
         </React.Fragment>
@@ -67,7 +72,7 @@ export function RulerOverlay({ points, cursor }: RulerOverlayProps): React.React
           />
           <Marker
             position={liveSeg.mid}
-            icon={makeDistanceIcon(formatDist(liveSeg.dist))}
+            icon={makeDistanceIcon(rulerLabel(liveSeg.a, liveSeg.b, liveSeg.dist))}
             interactive={false}
           />
         </>
