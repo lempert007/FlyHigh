@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import base64
 
+from export.html_utils import srcdoc_escape
+
 
 def render_combined_html(
     map_html: str,
@@ -25,18 +27,14 @@ def render_combined_html(
         Complete HTML string.
     """
 
-    def srcdoc_escape(html: str) -> str:
-        """Escape HTML for use in a srcdoc attribute (double-quoted)."""
-        return html.replace("&", "&amp;").replace('"', "&quot;")
-
     def b64(html: str) -> str:
         return base64.b64encode(html.encode("utf-8")).decode("ascii")
 
     tabs = [
         # map uses srcdoc so Leaflet gets a proper origin and can load tiles/scripts
-        ("map",     "2D Map",           None,                   srcdoc_escape(map_html)),
-        ("terrain", "3D Terrain",       b64(chart_3d_html),     None),
-        ("profile", "Altitude Profile", b64(profile_html),      None),
+        ("map", "2D Map", None, srcdoc_escape(map_html)),
+        ("terrain", "3D Terrain", b64(chart_3d_html), None),
+        ("profile", "Altitude Profile", b64(profile_html), None),
     ]
     if smart_route_diff_html is not None:
         # srcdoc (not data: URI) so nested iframes inside the diff page

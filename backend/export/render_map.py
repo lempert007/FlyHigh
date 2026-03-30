@@ -123,7 +123,9 @@ def render_map_html(
     folium.Marker(
         location=[lat, lon],
         icon=folium.Icon(color="green", icon="play", prefix="fa"),
-        popup=folium.Popup(f"<b>Start</b><br>Alt: {altitudes[start_index]:.1f} m MSL", max_width=200),
+        popup=folium.Popup(
+            f"<b>Start</b><br>Alt: {altitudes[start_index]:.1f} m MSL", max_width=200
+        ),
         tooltip="Start",
     ).add_to(m)
 
@@ -133,7 +135,9 @@ def render_map_html(
         folium.Marker(
             location=[lat, lon],
             icon=folium.Icon(color="purple", icon="flag", prefix="fa"),
-            popup=folium.Popup(f"<b>Landing</b><br>Alt: {altitudes[landing_index]:.1f} m MSL", max_width=200),
+            popup=folium.Popup(
+                f"<b>Landing</b><br>Alt: {altitudes[landing_index]:.1f} m MSL", max_width=200
+            ),
             tooltip="Landing",
         ).add_to(m)
 
@@ -143,7 +147,9 @@ def render_map_html(
         folium.Marker(
             location=[lat, lon],
             icon=folium.Icon(color="blue", icon=str(j + 1), prefix="fa"),
-            popup=folium.Popup(f"<b>Waypoint {j + 1}</b><br>Alt: {altitudes[idx]:.1f} m MSL", max_width=200),
+            popup=folium.Popup(
+                f"<b>Waypoint {j + 1}</b><br>Alt: {altitudes[idx]:.1f} m MSL", max_width=200
+            ),
             tooltip=f"Waypoint {j + 1}",
         ).add_to(m)
 
@@ -153,17 +159,19 @@ def render_map_html(
         folium.Marker(
             location=[lat, lon],
             icon=folium.Icon(color="red", icon="camera", prefix="fa"),
-            popup=folium.Popup(f"<b>POI {j + 1}</b><br>Alt: {altitudes[idx]:.1f} m MSL", max_width=200),
+            popup=folium.Popup(
+                f"<b>POI {j + 1}</b><br>Alt: {altitudes[idx]:.1f} m MSL", max_width=200
+            ),
             tooltip=f"POI {j + 1}",
         ).add_to(m)
 
     # Violation markers — colour and label by category
     _VIOL_STYLE = {
-        "safety":        ("red",    "times-circle",        "Safety Violation"),
-        "product_poi":   ("orange", "exclamation-triangle", "Product Violation — Scan Area"),
-        "product_route": ("beige",  "exclamation",         "Product Violation — Transit"),
+        "safety": ("red", "times-circle", "Safety Violation"),
+        "product_poi": ("orange", "exclamation-triangle", "Product Violation — Scan Area"),
+        "product_route": ("beige", "exclamation", "Product Violation — Transit"),
     }
-    for idx, desc, category in (violations or []):
+    for idx, desc, category in violations or []:
         lat, lon = latlons[idx]
         color, icon_name, label = _VIOL_STYLE.get(category, ("orange", "warning-sign", "Violation"))
         folium.Marker(

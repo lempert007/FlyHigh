@@ -5,10 +5,7 @@ Each test exercises the full HTTP stack (upload → plan → parse ZIP + metadat
 Synthetic rasters are used so no real terrain files are needed.
 """
 
-import io
-import json
 import statistics
-import zipfile
 
 from tests.conftest import CENTER_LAT, CENTER_LON, make_request, plan, upload
 
@@ -21,20 +18,7 @@ async def test_full_pipeline_returns_valid_zip(client, flat_tiff):
     artifacts and waypoints.json has the right schema.
     """
     session_id, _ = await upload(client, ("terrain.tif", flat_tiff))
-
-    resp = await client.post("/plan", json=make_request(session_id))
-    assert resp.status_code == 200
-    meta = json.loads(resp.headers["X-Plan-Meta"])
-    zf = zipfile.ZipFile(io.BytesIO(resp.content))
-    waypoints = json.loads(zf.read("waypoints.json"))
-
-    # ZIP must contain all four standard outputs
-    assert set(zf.namelist()) >= {
-        "waypoints.json",
-        "mission_report.html",
-        "mission_log.txt",
-        "waypoints.kml",
-    }
+    meta, waypoints = await plan(client, make_request(session_id))
 
     # Waypoints must be a non-empty list with the expected fields
     assert len(waypoints) > 0
@@ -161,9 +145,14 @@ async def test_lawnmower_waypoints_stay_inside_poi_bounds(client, flat_tiff):
 async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_dsm_tiff):
     """
     When the surface model (DSM) contains a 300 m obstacle spike but the bare-ground
-    model (DTM) is flat at 50 m, the altitude optimizer plans at ~80 m MSL based on
-    the DTM — but the safety checker compares against the DSM and must flag a
-    vertical violation at the spike.
+    model (DTM) is flat at 50 m, the planner detects an impossible AGL constraint:
+    staying ≥30 m above the 300 m DSM spike while staying ≤80 m above the 50 m DTM
+    floor is physically impossible. The planner must flag a 'terrain_band' violation.
+
+    The altitude planner uses the DSM as bubble_terrain, so it raises the drone above
+    the spike rather than flying through it — no 'vertical' violation from the safety
+    checker, but the impossible-band conflict is captured as a 'terrain_band' violation
+    during altitude planning.
     """
     session_id, _ = await upload(
         client,
@@ -186,11 +175,13 @@ async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_ds
     )
 
     assert len(meta["violations"]) > 0, (
-        "Expected at least one safety violation when flying over a 300 m obstacle "
-        "at an altitude planned for 50 m flat terrain"
+        "Expected at least one violation when flying over a 300 m obstacle "
+        "with max_agl=80 m above 50 m flat DTM"
     )
     kinds = {v["kind"] for v in meta["violations"]}
-    assert "vertical" in kinds, f"Expected a vertical violation; got kinds: {kinds}"
+    assert (
+        "terrain_band" in kinds
+    ), f"Expected a terrain_band violation for the impossible AGL constraint; got kinds: {kinds}"
 
 
 # ── 6. POI outside raster — graceful degradation ─────────────────────────────
@@ -199,21 +190,14 @@ async def test_safety_violation_on_spike_terrain(client, flat_dtm_tiff, spike_ds
 async def test_poi_outside_raster_degrades_gracefully(client, flat_tiff):
     """
     A POI placed far outside the terrain raster must not crash the planner.
-    The response must be HTTP 200 with a coverage_violation explaining the issue.
+    The plan must complete with violations explaining the issue.
     """
     session_id, _ = await upload(client, ("terrain.tif", flat_tiff))
 
-    resp = await client.post(
-        "/plan",
-        # lat=37.0 is in UTM zone 36S (same zone as the session) but ~4.5° from the
-        # raster centre — well outside the 0.05° raster extent
-        json=make_request(session_id, poi_lat=37.0, poi_lon=34.8),
-    )
-    assert (
-        resp.status_code == 200
-    ), f"Planner crashed instead of degrading gracefully: {resp.text[:300]}"
+    # lat=37.0 is in UTM zone 36S (same zone as the session) but ~4.5° from the
+    # raster centre — well outside the 0.05° raster extent
+    meta, _ = await plan(client, make_request(session_id, poi_lat=37.0, poi_lon=34.8))
 
-    meta = json.loads(resp.headers["X-Plan-Meta"])
     # Outside-raster terrain falls back to a fixed altitude, causing AGL clearance
     # violations — the planner must surface the problem, not silently succeed.
     assert bool(meta.get("violations")), (

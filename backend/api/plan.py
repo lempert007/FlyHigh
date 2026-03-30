@@ -13,21 +13,24 @@ This module is a thin adapter:
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import logging
 import re
 from datetime import UTC, date, datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import rasterio
 
 import numpy as np
 import utm as _utm_lib
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 from scipy.spatial import KDTree
 
 import config
 import session as session_store
-from core.battery import cumulative_energy_wh
+from core.battery import estimate_flight
 from core.poi import (
     build_poi_zone,
     compute_entry_bearing,
@@ -79,9 +82,8 @@ def _zip_filename(mission_name: str) -> str:
     return f"{slug}_{date.today().strftime('%Y%m%d')}.zip"
 
 
-@router.post("/plan")
-async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
-    """Compute an optimised terrain-following route and return a ZIP file."""
+def _run_planning_sync(req: RouteRequest) -> tuple[bytes, PlanMeta]:
+    """Synchronous planning worker. Returns (user_zip_bytes, meta)."""
     logger.info(
         "Planning route: %d POIs, %d waypoints, smart_route=%s",
         len(req.pois),
@@ -112,6 +114,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 break
 
         # ── 3. Build TerrainIndex objects ─────────────────────────────────────
+        logger.info("Opening raster tiles from session store")
         dsm_index = build_terrain_index(dsm_ds)
         dtm_index = build_terrain_index(dtm_ds) if dtm_ds is not dsm_ds else dsm_index
 
@@ -147,6 +150,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         global_band = AltitudeBand(min_agl_m=params.min_agl_m, max_agl_m=params.max_agl_m)
 
         # ── 6. Resolve POI order ───────────────────────────────────────────────
+        logger.info("Tracing transit legs between waypoints: %d waypoints", len(req.waypoints))
         if fc.optimize_poi_order and len(req.pois) > 2:
             pois_to_plan = _reorder_pois_tsp(req.pois, req.start.lat, req.start.lon)
             logger.info("POI order optimised (nearest-neighbor TSP)")
@@ -162,11 +166,12 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         prev_point = LatLon(lat=req.start.lat, lon=req.start.lon)
 
         for poi_idx, poi in enumerate(pois_to_plan):
-            zone = build_poi_zone(poi, global_band, zone_str, poi_idx)
-            poi_zones.append(zone)
-
             poi_center = LatLon(lat=poi.point.lat, lon=poi.point.lon)
             entry_bearing = compute_entry_bearing(prev_point, poi_center)
+            zone = build_poi_zone(
+                poi, global_band, zone_str, poi_idx, entry_bearing_deg=entry_bearing
+            )
+            poi_zones.append(zone)
             pattern = _expand_maneuver_latlon(
                 poi,
                 zone_str,
@@ -194,6 +199,8 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 prev_point = pattern[-1]
             else:
                 prev_point = poi_center
+
+        logger.info("Generating maneuver sweeps for %d POIs", len(pois_to_plan))
 
         # ── 8. Assemble MissionInput and call plan_route ───────────────────────
         bubble_terrain = _pick_terrain(fc.safety_radius_terrain, dsm_index, dtm_index)
@@ -282,12 +289,19 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
                 violations_info.append(_violation_to_info(v, int(pidx), category))
 
         # ── 10b. POI scan quality metric ───────────────────────────────────────
+        # Derived from violations_info (the authoritative safety output) so it
+        # stays consistent with all violation types — including the camera-range
+        # check which tests AGL against the lowest nearby surface, not the ground
+        # directly below, and would be missed by a raw agl_arr comparison.
         poi_mask = np.array([a in _POI_ACTIONS for a in dense_actions])
-        valid_poi = poi_mask & ~nan_mask
-        poi_total = int(valid_poi.sum())
+        poi_total = int(poi_mask.sum())
         if poi_total > 0:
-            poi_violated = int((agl_arr[valid_poi] > fc.max_agl_m).sum())
-            poi_scan_good_pct: float | None = round((1 - poi_violated / poi_total) * 100, 1)
+            poi_violated_indices = {
+                v.point_index for v in violations_info if v.category == "product_poi"
+            }
+            poi_scan_good_pct: float | None = round(
+                (1 - len(poi_violated_indices) / poi_total) * 100, 1
+            )
         else:
             poi_scan_good_pct = None
 
@@ -341,6 +355,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         headings = compute_headings(dense_utm)
 
         # ── 14. Waypoints JSON ────────────────────────────────────────────────
+        logger.info("Writing waypoints.json: %d dense waypoints", n_dense)
         waypoints_json = to_waypoints_json(
             dense_utm,
             final_alts,
@@ -405,7 +420,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 20. Cumulative energy for profile ─────────────────────────────────
-        cum_energy = cumulative_energy_wh(dense_utm, final_alts, params)
+        cum_energy = estimate_flight(dense_utm, final_alts, params).cumulative_wh
 
         bubble_peak_terrain, camera_min_terrain = compute_profile_bands(
             dense_utm, terrain_elevs, bubble_terrain, camera_terrain, params
@@ -452,6 +467,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 23. Mission log ────────────────────────────────────────────────────
+        logger.info("Generating mission_log.txt")
         route_hash = hashlib.sha256(
             json.dumps(req.model_dump(), default=str, sort_keys=True).encode()
         ).hexdigest()[:16]
@@ -480,6 +496,7 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         )
 
         # ── 23. Package ZIP ────────────────────────────────────────────────────
+        logger.info("Assembling ZIP archive")
         kml_str = render_kml(waypoints_json)
         poi_bands_json_str: str | None = None
         if poi_band_overrides:
@@ -581,19 +598,48 @@ async def plan_route_endpoint(req: RouteRequest) -> StreamingResponse:
         # Strip internal editor files before sending to the user.
         # meta.json is already embedded in zip_buf by build_zip().
         user_zip_bytes = strip_internal_files(zip_buf.getvalue())
-        return StreamingResponse(
-            iter([user_zip_bytes]),
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f'attachment; filename="{_zip_filename(req.name)}"',
-            },
-        )
+        return user_zip_bytes, meta
 
     except HTTPException:
         raise
     except Exception as exc:
         logger.exception("Planning failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Planning error: {exc}") from exc
+
+
+@router.post("/plan")
+def plan_route_endpoint(req: RouteRequest) -> Response:
+    """Compute an optimised terrain-following route and return a ZIP file."""
+    zip_bytes, meta = _run_planning_sync(req)
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{_zip_filename(req.name)}"',
+            "X-Plan-Meta": json.dumps(json.loads(meta.model_dump_json()), ensure_ascii=True),
+        },
+    )
+
+
+@router.get("/plan/result")
+async def plan_result_endpoint(session_id: str) -> Response:
+    """Return the user ZIP from the most recent plan in this session."""
+    sess = session_store.get_session(session_id)
+    if sess is None or sess.last_plan is None or sess.last_plan.zip_bytes is None:
+        raise HTTPException(404, "No plan result available for this session")
+    user_zip_bytes = strip_internal_files(sess.last_plan.zip_bytes)
+    return Response(
+        content=user_zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{_zip_filename(sess.last_plan.mission_name)}"'
+            ),
+            "X-Plan-Meta": json.dumps(
+                json.loads(sess.last_plan.meta.model_dump_json()), ensure_ascii=True
+            ),
+        },
+    )
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -622,7 +668,7 @@ def _violation_to_info(v: Violation, point_index: int, category: str) -> Violati
 def _resolve_dsm_dtm(
     datasets: dict,
     file_infos: dict,
-) -> tuple:
+) -> tuple[rasterio.DatasetReader, rasterio.DatasetReader]:
     """Pick DSM and DTM datasets from the session files."""
     file_list = list(datasets.items())
     if len(file_list) == 1:
@@ -750,13 +796,3 @@ def _find_poi_block_starts(dense_actions: list[str]) -> list[int]:
             result.append(i)
         prev = action
     return result
-
-
-async def _iter_buf(buf: io.BytesIO):
-    """Yield the ZIP buffer in chunks."""
-    chunk_size = 65536
-    while True:
-        chunk = buf.read(chunk_size)
-        if not chunk:
-            break
-        yield chunk

@@ -7,7 +7,9 @@ All rasters are 64×64 pixels, WGS-84 EPSG:4326, centred at lat=32.0 lon=34.8.
 
 import io
 import json
+import os
 import sys
+import uuid
 import zipfile
 from pathlib import Path
 
@@ -21,32 +23,40 @@ from rasterio.transform import from_bounds
 
 # Make the backend package importable from the tests subdirectory
 sys.path.insert(0, str(Path(__file__).parent.parent))
+import config  # noqa: E402
 from main import app  # noqa: E402
 
 # ── Raster geography ─────────────────────────────────────────────────────────
 
-CENTER_LAT = 32.5   # clearly inside UTM zone 36S (32–40 °N), avoiding the 32° band boundary
+CENTER_LAT = 32.5  # clearly inside UTM zone 36S (32–40 °N), avoiding the 32° band boundary
 CENTER_LON = 34.8
-SPAN       = 0.05   # degrees — ~5.5 km × ~4.4 km at lat 32
+SPAN = 0.05  # degrees — ~5.5 km × ~4.4 km at lat 32
 
 
 def _make_tiff(data: np.ndarray, span: float = SPAN) -> bytes:
     """Encode a 2-D numpy array as a single-band float32 GeoTIFF bytes."""
     H, W = data.shape
-    west,  east  = CENTER_LON - span / 2, CENTER_LON + span / 2
+    west, east = CENTER_LON - span / 2, CENTER_LON + span / 2
     south, north = CENTER_LAT - span / 2, CENTER_LAT + span / 2
     transform = from_bounds(west, south, east, north, W, H)
     buf = io.BytesIO()
     with rasterio.open(
-        buf, "w",
-        driver="GTiff", height=H, width=W, count=1,
-        dtype="float32", crs=CRS.from_epsg(4326), transform=transform,
+        buf,
+        "w",
+        driver="GTiff",
+        height=H,
+        width=W,
+        count=1,
+        dtype="float32",
+        crs=CRS.from_epsg(4326),
+        transform=transform,
     ) as ds:
         ds.write(data.astype("float32"), 1)
     return buf.getvalue()
 
 
 # ── Terrain fixtures (session-scoped — built once per test run) ───────────────
+
 
 @pytest.fixture(scope="session")
 def flat_tiff() -> bytes:
@@ -88,40 +98,65 @@ def spike_dsm_tiff() -> bytes:
 
 # ── HTTP client fixture ───────────────────────────────────────────────────────
 
+
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+# ── TIFF library cleanup fixture ─────────────────────────────────────────────
+
+
+@pytest.fixture(autouse=True)
+def cleanup_test_tiffs():
+    """Remove any _test_*.tif files written to the TIFF library during the test."""
+    yield
+    for name in os.listdir(config.TIFF_LIBRARY_PATH):
+        if name.startswith("_test_"):
+            try:
+                os.unlink(os.path.join(config.TIFF_LIBRARY_PATH, name))
+            except OSError:
+                pass
 
 
 # ── Helpers (plain functions, not fixtures) ───────────────────────────────────
 
-async def upload(client, *tiffs: tuple[str, bytes]) -> tuple[str, list[str]]:
+
+async def upload(
+    client,
+    *args: tuple[str, bytes] | dict[str, str],
+) -> tuple[str, list[str]]:
     """
-    Upload one or more (filename, bytes) pairs.  Returns (session_id, [filenames]).
-    file_types defaults to empty — the backend infers DSM/DTM from the filename.
-    Pass explicit file_types as the last positional arg if needed.
+    Write TIFF bytes to the server-side library, activate them into a new session.
+    Returns (session_id, [filenames]).
+
+    Accepts (name, bytes) tuples. An optional trailing dict maps original names to
+    explicit file types (e.g. ``{"dtm.tif": "DTM", "dsm.tif": "DSM"}``).
+
+    Files are written with a unique _test_ prefix so cleanup_test_tiffs removes them
+    after each test without touching real library files.
     """
     file_types: dict[str, str] = {}
-    # Allow caller to pass file_types as a trailing dict
-    real_tiffs = []
-    for item in tiffs:
-        if isinstance(item, dict):
-            file_types = item
+    tiff_pairs: list[tuple[str, bytes]] = []
+    for arg in args:
+        if isinstance(arg, dict):
+            file_types = arg
         else:
-            real_tiffs.append(item)
+            tiff_pairs.append(arg)  # type: ignore[arg-type]
 
-    files = [("files", (name, data, "image/tiff")) for name, data in real_tiffs]
-    resp = await client.post(
-        "/upload",
-        files=files,
-        data={"file_types": json.dumps(file_types)},
-    )
+    selections = []
+    for name, data in tiff_pairs:
+        unique_name = f"_test_{uuid.uuid4().hex[:8]}_{name}"
+        dest = os.path.join(config.TIFF_LIBRARY_PATH, unique_name)
+        with open(dest, "wb") as f:
+            f.write(data)
+        selections.append({"name": unique_name, "type": file_types.get(name, "DSM")})
+
+    resp = await client.post("/upload", json={"selections": selections})
     assert resp.status_code == 200, f"Upload failed: {resp.text}"
-    data = resp.json()
-    return data["session_id"], [f["name"] for f in data["files"]]
+    result = resp.json()
+    return result["session_id"], [f["name"] for f in result["files"]]
 
 
 def make_request(
@@ -148,7 +183,7 @@ def make_request(
         "session_id": session_id,
         "name": "test_mission",
         "notes": "",
-        "start":   {"lat": start_lat, "lon": start_lon},
+        "start": {"lat": start_lat, "lon": start_lon},
         "landing": {"lat": start_lat, "lon": start_lon},
         "waypoints": [],
         "pois": [
@@ -156,7 +191,7 @@ def make_request(
                 "point": {"lat": p["lat"], "lon": p["lon"]},
                 "maneuver": {
                     "type": "lawnmower",
-                    "width_m":  p.get("w", width_m),
+                    "width_m": p.get("w", width_m),
                     "height_m": p.get("h", height_m),
                     "sweep_spacing_m": 30,
                     "poi_min_agl_m": None,
@@ -169,12 +204,12 @@ def make_request(
             "min_agl_m": min_agl,
             "max_agl_m": max_agl,
             "cruise_speed_ms": 10,
-            "climb_rate_ms":   5,
-            "battery_wh":      battery_wh,
+            "climb_rate_ms": 5,
+            "battery_wh": battery_wh,
             "drone_weight_kg": 0.5,
-            "spacing_m":       20,
-            "point_radius_m":  5,
-            "smart_route":        False,
+            "spacing_m": 20,
+            "point_radius_m": 5,
+            "smart_route": False,
             "optimize_poi_order": optimize_order,
             "min_altitude_step_m": min_step_m,
         },
@@ -183,13 +218,15 @@ def make_request(
 
 async def plan(client, request: dict) -> tuple[dict, list[dict]]:
     """
-    POST /plan, assert 200, return (meta_dict, waypoints_list).
-    meta comes from the X-Plan-Meta header; waypoints from the ZIP.
+    POST /plan — returns application/zip with X-Plan-Meta header.
+    Returns (meta_dict, waypoints_list).
     """
     resp = await client.post("/plan", json=request)
-    assert resp.status_code == 200, f"Plan failed: {resp.text[:500]}"
+    assert resp.status_code == 200, f"Plan failed (status {resp.status_code}): {resp.text[:500]}"
 
-    meta = json.loads(resp.headers["X-Plan-Meta"])
+    meta_header = resp.headers.get("x-plan-meta")
+    assert meta_header is not None, "Response missing X-Plan-Meta header"
+    meta: dict = json.loads(meta_header)
 
     zf = zipfile.ZipFile(io.BytesIO(resp.content))
     waypoints = json.loads(zf.read("waypoints.json"))

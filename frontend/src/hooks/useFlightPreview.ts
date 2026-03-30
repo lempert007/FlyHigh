@@ -56,8 +56,14 @@ export function useFlightPreview(routePoints: LatLon[], cruiseSpeedMs: number): 
     (prog: number): { position: LatLon; bearing: number } | null => {
       if (routePoints.length < 2 || totalDistM === 0) return null;
       const targetDist = Math.min(Math.max(prog, 0), 1) * totalDistM;
-      let i = 1;
-      while (i < cumDistances.length - 1 && cumDistances[i] < targetDist) i++;
+      let lo = 1,
+        hi = cumDistances.length - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (cumDistances[mid] < targetDist) lo = mid + 1;
+        else hi = mid;
+      }
+      const i = lo;
       const prev = routePoints[i - 1];
       const curr = routePoints[i];
       const segDist = cumDistances[i] - cumDistances[i - 1];

@@ -100,7 +100,11 @@ class TerrainIndex:
         nan_mask = np.isnan(elev_vals)
         if nan_mask.any():
             valid = elev_vals[~nan_mask]
-            safe_fill = float(valid.max()) + config.DEFAULT_MAX_AGL_M
+            safe_fill = (
+                float(valid.max()) + config.DEFAULT_MAX_AGL_M
+                if len(valid) > 0
+                else config.DEFAULT_MAX_AGL_M
+            )
             elev_vals = np.where(nan_mask, safe_fill, elev_vals)
 
         samples = [
@@ -116,15 +120,19 @@ class TerrainIndex:
     def disc_peak_at(self, point: LatLon, radius_m: float) -> float:
         """Peak terrain elevation within a disc of radius_m centered at point.
 
-        Samples the center plus one ring of BUBBLE_SAMPLE_COUNT azimuth points at
-        the boundary.  Returns NaN only when all samples are outside the raster.
-        Used to match the disc-based safety check semantics for single-point queries.
+        Uses the same multi-ring sampling geometry as the safety checker
+        (BUBBLE_RING_COUNT concentric rings + center), so planned altitudes always
+        satisfy the safety check.  Single-ring sampling caused violations when
+        terrain features existed only within inner rings.
+        Returns NaN only when all samples are outside the raster.
         """
         e, n = self._to_utm(point)
         n_az = config.BUBBLE_SAMPLE_COUNT
+        n_rings = config.BUBBLE_RING_COUNT
         angles = np.linspace(0.0, 2 * np.pi, n_az, endpoint=False)
-        ring_e = e + radius_m * np.cos(angles)
-        ring_n = n + radius_m * np.sin(angles)
+        ring_radii = np.linspace(radius_m / n_rings, radius_m, n_rings)
+        ring_e = (e + ring_radii[:, np.newaxis] * np.cos(angles)).ravel()
+        ring_n = (n + ring_radii[:, np.newaxis] * np.sin(angles)).ravel()
         all_e = np.concatenate([[e], ring_e])
         all_n = np.concatenate([[n], ring_n])
         pts = np.column_stack([all_e, all_n])
@@ -140,11 +148,12 @@ class TerrainIndex:
     ) -> TerrainProfile:
         """Sample terrain along a ribbon, returning the max elevation at each sample position.
 
-        Samples 7 directions at each position: 5 lateral (center, ±R/2, ±R perpendicular)
-        plus 2 forward (R/2 and R ahead along the path direction).  The forward samples
-        are critical for approaches to hills — they capture terrain the safety-disc
-        "sees ahead" before the drone arrives, so ramp pins are inserted at the
-        correct altitude instead of reacting too late.
+        Samples 10 directions at each position: 7 lateral (center, ±R/3, ±2R/3, ±R
+        perpendicular) plus 3 forward (R/3, 2R/3, R ahead along the path direction).
+        The lateral scales mirror the safety checker's 3-ring disc structure so the
+        ribbon floor is consistent with what the safety checker enforces.  The forward
+        samples are critical for hill approaches — they capture terrain the safety-disc
+        "sees ahead" before the drone arrives, so ramp pins are inserted in time.
         """
         se, sn = self._to_utm(start)
         ee, en = self._to_utm(end)
@@ -167,15 +176,20 @@ class TerrainIndex:
         fwd_e = de / leg_len
         fwd_n = dn / leg_len
 
-        # (perp_scale, fwd_scale) — each multiplied by half_width_m
+        # (perp_scale, fwd_scale) — each multiplied by half_width_m.
+        # Lateral scales match the safety checker's 3-ring structure (R/3, 2R/3, R)
+        # so the ribbon floor is consistent with what the safety checker enforces.
         directions = [
             (0.0, 0.0),  # center
-            (1.0, 0.0),  # right
-            (-1.0, 0.0),  # left
-            (0.5, 0.0),  # right half
-            (-0.5, 0.0),  # left half
-            (0.0, 1.0),  # ahead full  ← catches hill-approach violations
-            (0.0, 0.5),  # ahead half
+            (1.0, 0.0),  # right R
+            (-1.0, 0.0),  # left R
+            (2 / 3, 0.0),  # right 2R/3
+            (-2 / 3, 0.0),  # left 2R/3
+            (1 / 3, 0.0),  # right R/3  ← inner ring, matches safety checker
+            (-1 / 3, 0.0),  # left R/3
+            (0.0, 1.0),  # ahead R  ← catches hill-approach violations
+            (0.0, 2 / 3),  # ahead 2R/3
+            (0.0, 1 / 3),  # ahead R/3
         ]
         all_pts = []
         for ps, fs in directions:
@@ -187,8 +201,8 @@ class TerrainIndex:
                     ]
                 )
             )
-        pts = np.vstack(all_pts)  # (7 * n_pts, 2)
-        all_elevs = self._sample_utm(pts)  # (7 * n_pts,)
+        pts = np.vstack(all_pts)  # (10 * n_pts, 2)
+        all_elevs = self._sample_utm(pts)  # (10 * n_pts,)
 
         elev_mat = all_elevs.reshape(len(directions), n_pts)
         elev_vals = np.nanmax(elev_mat, axis=0)
@@ -292,6 +306,7 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
         top=ds.bounds.top,
     )
 
+    logger.info("Reprojecting CRS -> UTM coordinate frame")
     destination = np.empty((height, width), dtype=np.float64)
     nodata_val = ds.nodata if ds.nodata is not None else config.NODATA_FILL
     rasterio.warp.reproject(
@@ -319,6 +334,7 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
     n_axis_sorted = n_axis[::-1]
     elev_grid = destination[::-1, :]
 
+    logger.info("Building terrain interpolator")
     interpolator = RegularGridInterpolator(
         (n_axis_sorted, e_axis),
         elev_grid,

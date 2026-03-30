@@ -9,12 +9,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 
 if TYPE_CHECKING:
     from core.terrain import TerrainIndex
+
+
+# ── Action type ───────────────────────────────────────────────────────────────
+
+ActionType = Literal[
+    "waypoint",
+    "poi",
+    "lawnmower",
+    "warp_weft",
+    "land",
+    "zone_crossing",
+    "terrain_split",
+    "ramp_start",
+    "ramp_pin",
+]
+"""All valid action strings for a Waypoint3D."""
 
 
 # ── Geographic primitives ─────────────────────────────────────────────────────
@@ -47,7 +63,7 @@ class Waypoint3D:
     lat: float
     lon: float
     alt_msl: float  # metres MSL
-    action: str  # "waypoint" | "poi" | "lawnmower" | "warp_weft" | "land" | "zone_crossing"
+    action: ActionType
 
 
 # ── Terrain sampling ──────────────────────────────────────────────────────────

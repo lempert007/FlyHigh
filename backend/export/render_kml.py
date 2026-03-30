@@ -24,26 +24,24 @@ def render_kml(waypoints: list[dict]) -> str:
             f'<coordinates>{wp["lon"]},{wp["lat"]},{wp["alt_m"]}</coordinates>'
             f'</Point></Placemark>'
         )
-    route_coords = " ".join(
-        f'{wp["lon"]},{wp["lat"]},{wp["alt_m"]}' for wp in waypoints
-    )
+    route_coords = " ".join(f'{wp["lon"]},{wp["lat"]},{wp["alt_m"]}' for wp in waypoints)
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         '<kml xmlns="http://www.opengis.net/kml/2.2">',
-        '<Document>',
-        '  <name>FlyHigh Mission</name>',
+        "<Document>",
+        "  <name>FlyHigh Mission</name>",
         '  <Style id="wp">',
-        '    <IconStyle><color>ff0000ff</color><scale>0.8</scale></IconStyle>',
-        '  </Style>',
+        "    <IconStyle><color>ff0000ff</color><scale>0.8</scale></IconStyle>",
+        "  </Style>",
         *placemarks,
-        '  <Placemark>',
-        '    <name>Route</name>',
-        '    <LineString>',
-        '      <altitudeMode>absolute</altitudeMode>',
-        f'      <coordinates>{route_coords}</coordinates>',
-        '    </LineString>',
-        '  </Placemark>',
-        '</Document>',
-        '</kml>',
+        "  <Placemark>",
+        "    <name>Route</name>",
+        "    <LineString>",
+        "      <altitudeMode>absolute</altitudeMode>",
+        f"      <coordinates>{route_coords}</coordinates>",
+        "    </LineString>",
+        "  </Placemark>",
+        "</Document>",
+        "</kml>",
     ]
     return "\n".join(lines)

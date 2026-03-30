@@ -70,23 +70,20 @@ export async function activateTiffs(selections: TiffSelection[]): Promise<Upload
 /** Cancels any in-flight planRoute request when a new one starts. */
 let _planAbortController: AbortController | null = null;
 
-/** Plan a route and get back the ZIP blob + metadata. Aborts after 5 minutes.
- * Automatically cancels any previous in-flight plan request. */
+/** Plan a route. Returns the ZIP blob and plan metadata. Aborts after 5 minutes. */
 export async function planRoute(
   sessionId: string,
   routeRequest: Record<string, unknown>
 ): Promise<{ blob: Blob; meta: PlanMeta | null }> {
-  // Cancel previous request if still pending
   _planAbortController?.abort();
   const controller = new AbortController();
   _planAbortController = controller;
   const timeout = setTimeout(() => controller.abort(), 300_000);
   try {
-    const body = JSON.stringify({ session_id: sessionId, ...routeRequest });
     const res = await fetch("/plan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body,
+      body: JSON.stringify({ session_id: sessionId, ...routeRequest }),
       signal: controller.signal,
     });
     if (!res.ok) {
@@ -94,17 +91,27 @@ export async function planRoute(
       throw new Error(parseErrorDetail(data, `Planning failed: ${res.status}`));
     }
     const blob = await res.blob();
-    const meta = await extractMetaFromZip(blob);
+    const metaHeader = res.headers.get("X-Plan-Meta");
+    const meta: PlanMeta | null = metaHeader ? (JSON.parse(metaHeader) as PlanMeta) : null;
     return { blob, meta };
   } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
+    if (err instanceof Error && err.name === "AbortError")
       throw new Error("Request timed out — please try again.");
-    }
     throw err;
   } finally {
     clearTimeout(timeout);
     if (_planAbortController === controller) _planAbortController = null;
   }
+}
+
+/** Fetch the ZIP from the most recent plan in this session. */
+export async function getPlanResult(sessionId: string): Promise<Blob> {
+  const res = await fetch(`/plan/result?session_id=${encodeURIComponent(sessionId)}`);
+  if (!res.ok) {
+    const data: ErrorBody | null = await res.json().catch(() => null);
+    throw new Error(parseErrorDetail(data, `Failed to fetch plan result: ${res.status}`));
+  }
+  return res.blob();
 }
 
 interface BuildRouteRequestOptions {

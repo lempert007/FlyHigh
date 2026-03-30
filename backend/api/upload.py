@@ -39,7 +39,9 @@ def _validate_name(name: str) -> None:
     if "/" in name or "\\" in name or ".." in name:
         raise HTTPException(status_code=422, detail=f"Invalid filename: {name!r}")
     if not (name.lower().endswith(".tif") or name.lower().endswith(".tiff")):
-        raise HTTPException(status_code=422, detail=f"File {name!r} is not a GeoTIFF (.tif / .tiff)")
+        raise HTTPException(
+            status_code=422, detail=f"File {name!r} is not a GeoTIFF (.tif / .tiff)"
+        )
 
 
 @router.get("/tiffs")
@@ -96,6 +98,8 @@ async def activate_tiffs(body: ActivateRequest) -> UploadResponse:
     except Exception as exc:
         session_store.delete_session(session_id)
         logger.exception("Unexpected error during tiff activation: %s", exc)
-        raise HTTPException(status_code=500, detail="Internal server error during activation") from exc
+        raise HTTPException(
+            status_code=500, detail="Internal server error during activation"
+        ) from exc
 
     return UploadResponse(session_id=session_id, files=file_infos, notice=None)

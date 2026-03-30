@@ -13,6 +13,7 @@ import numpy as np
 
 import config
 from core.types import AltitudeBand, LatLon, PoiZone, ZoneCrossing
+from core.utm_utils import approx_distance_m
 
 _EPSILON = 1e-15  # tiny jitter to avoid degenerate on-edge cases in ray-casting
 
@@ -75,12 +76,7 @@ def find_zone_crossings(
     """
     dlat = leg_end.lat - leg_start.lat
     dlon = leg_end.lon - leg_start.lon
-
-    # Convert rough degree length to metres (approx)
-    ref_lat = (leg_start.lat + leg_end.lat) / 2
-    lat_m = 111_320.0
-    lon_m = 111_320.0 * math.cos(math.radians(ref_lat))
-    leg_len_m = math.hypot(dlat * lat_m, dlon * lon_m)
+    leg_len_m = approx_distance_m(leg_start, leg_end)
 
     if leg_len_m < 1e-3:
         return []

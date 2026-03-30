@@ -33,6 +33,7 @@ from models import (
     AltEditBody,
     CreateMissionRequest,
     MissionSummary,
+    PlanMeta,
     SaveFromSessionBody,
     SaveMissionRequest,
 )
@@ -67,9 +68,9 @@ async def get_mission(folder: str) -> dict:
         data["plan_meta"] = load_plan_meta(folder)
         return data
     except FileNotFoundError:
-        raise HTTPException(404, f"Mission {folder!r} not found")
+        raise HTTPException(status_code=404, detail=f"Mission {folder!r} not found")
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.put("/{folder}/plan", status_code=204)
@@ -77,14 +78,14 @@ async def save_mission_plan(folder: str, request: Request) -> None:
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     zip_bytes = await request.body()
     if not zip_bytes:
-        raise HTTPException(422, "Empty body")
+        raise HTTPException(status_code=422, detail="Empty body")
     try:
         save_plan(folder, zip_bytes)
     except FileNotFoundError:
-        raise HTTPException(404, f"Mission {folder!r} not found")
+        raise HTTPException(status_code=404, detail=f"Mission {folder!r} not found")
 
 
 @router.get("/{folder}/plan")
@@ -92,10 +93,10 @@ async def get_mission_plan(folder: str) -> FileResponse:
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     path = _plan_zip_path(folder)
     if not os.path.isfile(path):
-        raise HTTPException(404, "No saved plan for this mission")
+        raise HTTPException(status_code=404, detail="No saved plan for this mission")
     return FileResponse(path, media_type="application/zip", filename=f"{folder}_plan.zip")
 
 
@@ -105,14 +106,14 @@ async def save_plan_from_session_route(folder: str, body: SaveFromSessionBody) -
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     data = session_store.get_plan_data(body.session_id)
     if data is None or data.zip_bytes is None:
-        raise HTTPException(404, "No plan data found for this session")
+        raise HTTPException(status_code=404, detail="No plan data found for this session")
     try:
         save_plan(folder, data.zip_bytes)
     except FileNotFoundError:
-        raise HTTPException(404, f"Mission {folder!r} not found")
+        raise HTTPException(status_code=404, detail=f"Mission {folder!r} not found")
 
 
 @router.get("/{folder}/editor-data")
@@ -121,10 +122,12 @@ async def get_mission_editor_data(folder: str) -> dict:
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     zip_path = _plan_zip_path(folder)
     if not os.path.isfile(zip_path):
-        raise HTTPException(404, "No saved plan for this mission — plan the route first.")
+        raise HTTPException(
+            status_code=404, detail="No saved plan for this mission — plan the route first."
+        )
     try:
         with open(zip_path, "rb") as f:
             zb = f.read()
@@ -157,7 +160,9 @@ async def get_mission_editor_data(folder: str) -> dict:
             "camera_min_terrain": camera_min,
         }
     except KeyError:
-        raise HTTPException(409, "Plan ZIP is missing required files — re-plan the route.")
+        raise HTTPException(
+            status_code=409, detail="Plan ZIP is missing required files — re-plan the route."
+        )
 
 
 @router.post("/{folder}/altitude-edit")
@@ -166,20 +171,23 @@ async def apply_folder_altitude_edit(folder: str, body: AltEditBody) -> Streamin
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     zip_path = _plan_zip_path(folder)
     if not os.path.isfile(zip_path):
-        raise HTTPException(404, "No saved plan for this mission")
+        raise HTTPException(status_code=404, detail="No saved plan for this mission")
 
     with open(zip_path, "rb") as f:
         zip_bytes = f.read()
 
-    with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
-        wps = json.loads(zf.read("waypoints.json"))
-        old_agl = np.array(json.loads(zf.read("agl_profile.json")), dtype=float)
-        from models import PlanMeta
-
-        meta = PlanMeta(**json.loads(zf.read("meta.json")))
+    try:
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            wps = json.loads(zf.read("waypoints.json"))
+            old_agl = np.array(json.loads(zf.read("agl_profile.json")), dtype=float)
+            meta = PlanMeta(**json.loads(zf.read("meta.json")))
+    except KeyError:
+        raise HTTPException(
+            status_code=409, detail="Plan ZIP is missing required files — re-plan the route."
+        )
 
     old_alts = np.array([wp["alt_m"] for wp in wps], dtype=float)
     terrain_elevs = old_alts - old_agl
@@ -199,7 +207,7 @@ async def apply_folder_altitude_edit(folder: str, body: AltEditBody) -> Streamin
             original_meta=meta,
         )
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
 
     save_plan(folder, new_zip_bytes)
     user_zip = strip_internal_files(new_zip_bytes)
@@ -215,12 +223,12 @@ async def put_mission(folder: str, req: SaveMissionRequest) -> dict:
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
 
     try:
         existing = load_mission(folder)
     except FileNotFoundError:
-        raise HTTPException(404, f"Mission {folder!r} not found")
+        raise HTTPException(status_code=404, detail=f"Mission {folder!r} not found")
 
     data = {
         "schema_version": 1,
@@ -241,9 +249,9 @@ async def delete_mission_route(folder: str) -> None:
         _validate_folder(folder)
         delete_mission(folder)
     except FileNotFoundError:
-        raise HTTPException(404, f"Mission {folder!r} not found")
+        raise HTTPException(status_code=404, detail=f"Mission {folder!r} not found")
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.get("/{folder}/thumbnail")
@@ -251,8 +259,8 @@ async def get_thumbnail(folder: str) -> FileResponse:
     try:
         _validate_folder(folder)
     except ValueError as exc:
-        raise HTTPException(422, str(exc))
+        raise HTTPException(status_code=422, detail=str(exc))
     path = _thumbnail_path(folder)
     if not os.path.isfile(path):
-        raise HTTPException(404, "Thumbnail not available")
+        raise HTTPException(status_code=404, detail="Thumbnail not available")
     return FileResponse(path, media_type="image/png")

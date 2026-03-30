@@ -22,9 +22,19 @@ router = APIRouter(prefix="/presets", tags=["presets"])
 
 # Built-in defaults — mirrors the hardcoded values in frontend/src/dronePresets.ts.
 BUILTIN_PRESETS: list[PresetItem] = [
-    PresetItem(name="Drone 1",      cruise_speed_ms=10, climb_rate_ms=3, battery_wh=600,  drone_weight_kg=6.0),
-    PresetItem(name="Drone 2",      cruise_speed_ms=15, climb_rate_ms=6, battery_wh=1550, drone_weight_kg=2.5),
-    PresetItem(name="Fixed Wing 1", cruise_speed_ms=25, climb_rate_ms=4, battery_wh=300,  drone_weight_kg=1.5),
+    PresetItem(
+        name="Drone 1", cruise_speed_ms=10, climb_rate_ms=3, battery_wh=600, drone_weight_kg=6.0
+    ),
+    PresetItem(
+        name="Drone 2", cruise_speed_ms=15, climb_rate_ms=6, battery_wh=1550, drone_weight_kg=2.5
+    ),
+    PresetItem(
+        name="Fixed Wing 1",
+        cruise_speed_ms=25,
+        climb_rate_ms=4,
+        battery_wh=300,
+        drone_weight_kg=1.5,
+    ),
 ]
 
 _PRESETS_FILE = MISSIONS_ROOT / "presets.json"
@@ -38,7 +48,9 @@ def _load_from_disk() -> list[PresetItem] | None:
         raw = json.loads(_PRESETS_FILE.read_text(encoding="utf-8"))
         return [PresetItem.model_validate(item) for item in raw]
     except Exception:
-        logger.warning("presets.json could not be parsed — falling back to built-ins", exc_info=True)
+        logger.warning(
+            "presets.json could not be parsed — falling back to built-ins", exc_info=True
+        )
         return None
 
 

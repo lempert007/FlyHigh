@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 from config import SMART_ROUTE_LATERAL_SAMPLES
 from core.altitude import plan_altitude_profile
-from core.battery import estimate_energy_wh, estimate_flight_time_s
+from core.battery import estimate_flight
 from core.safety import check_route_safety
 from core.terrain import sample_elevation as _sample_elevation
 from core.types import (
@@ -120,7 +120,7 @@ def densify_waypoints_3d(
 
     # Assign action from the nearest key waypoint using binary search
     actions = [w.action for w in key_waypoints]
-    indices = np.searchsorted(cum_dist, sample_dists, side="right").clip(0, len(cum_dist) - 1)
+    indices = np.searchsorted(cum_dist, sample_dists, side="left").clip(0, len(cum_dist) - 1)
     _, _, zone_number, zone_letter = utm.from_latlon(key_waypoints[0].lat, key_waypoints[0].lon)
     zone_str = f"{zone_number}{zone_letter}"
 
@@ -155,6 +155,9 @@ def _smart_route_lateral(
 
     Scoring: minimise terrain elevation range (max−min) along the shifted
     path, which directly reduces the altitude changes the drone must make.
+
+    Note: shifted points are NOT validated against POI zones.  Only pure
+    transit legs (no adjacent POI actions) are eligible for lateral shifting.
     """
     poi_actions = {"lawnmower", "warp_weft", "poi"}
     pts = list(key_waypoints)
@@ -232,17 +235,16 @@ def plan_route(mission: MissionInput) -> MissionResult:
     """Execute the full mission planning pipeline.
 
     Steps:
-        1. Resolve POI visit order.
-        2. Build global AltitudeBand.
-        3. Build PoiZone objects and 2-D waypoint sequences.
-        4. Assemble full 2-D waypoint list.
-        5. Compute 3-D altitude profile (sparse key waypoints).
-        6. Optional Smart Route lateral shift.
-        7. Densify key waypoints to spacing_m grid.
-        8. Compute headings.
-        9. Run safety validation.
-       10. Estimate energy and flight time.
-       11. Return MissionResult.
+        1. Assemble full 2-D waypoint + action list (start, transit WPs, POI patterns, landing).
+        2. Compute 3-D altitude profile via plan_altitude_profile() — 9 sub-steps inside.
+        3. Optional Smart Route lateral corridor shift.
+        4. Densify key waypoints to spacing_m grid.
+        5. Run safety validation (vertical clearance, bubble disc, camera range).
+        6. Estimate energy and flight time.
+        7. Return MissionResult.
+
+    Note: POI ordering, TerrainIndex building, and heading computation are done by
+    the caller (api/plan.py) before and after this function.
     """
     params = mission.params
     dtm = mission.dtm
@@ -254,6 +256,9 @@ def plan_route(mission: MissionInput) -> MissionResult:
     # the MissionInput — use zones and patterns as-is.
     ordered_zones = mission.poi_zones
     ordered_2d = mission.poi_2d_waypoints
+    assert len(ordered_zones) == len(
+        ordered_2d
+    ), f"Zone/pattern count mismatch: {len(ordered_zones)} zones vs {len(ordered_2d)} patterns"
 
     # ── Steps 2–4: Assemble the full 2-D waypoint + action list ───────────────
     waypoints_2d: list[LatLon] = [mission.start]
@@ -326,6 +331,11 @@ def plan_route(mission: MissionInput) -> MissionResult:
         )
 
     # ── Step 7: Densify ───────────────────────────────────────────────────────
+    logger.info(
+        "Densifying waypoints and estimating energy: %d key waypoints at %.0f m spacing",
+        len(key_wps),
+        params.spacing_m,
+    )
     dense_wps = densify_waypoints_3d(key_wps, params.spacing_m)
     logger.info("Dense waypoints: %d at %.1f m spacing", len(dense_wps), params.spacing_m)
 
@@ -344,17 +354,15 @@ def plan_route(mission: MissionInput) -> MissionResult:
 
     # ── Step 10: Energy and flight time ───────────────────────────────────────
     dense_alts = np.array([w.alt_msl for w in dense_wps])
-    energy_wh = estimate_energy_wh(dense_utm, dense_alts, params)
-    flight_time_s = estimate_flight_time_s(dense_utm, dense_alts, params)
+    flight = estimate_flight(dense_utm, dense_alts, params)
     total_dist_m = float(compute_cumulative_distances(dense_utm)[-1]) if len(dense_utm) > 1 else 0.0
-    budget_pct = (100.0 * energy_wh / params.battery_wh) if params.battery_wh > 0 else float("inf")
 
     logger.info(
         "Route complete: %.0f m, %.0f s, %.1f Wh (%.0f%% battery)",
         total_dist_m,
-        flight_time_s,
-        energy_wh,
-        budget_pct,
+        flight.flight_time_s,
+        flight.energy_wh,
+        flight.budget_pct,
     )
 
     return MissionResult(
@@ -362,9 +370,9 @@ def plan_route(mission: MissionInput) -> MissionResult:
         dense_utm=dense_utm,
         violations=all_violations,
         total_distance_m=round(total_dist_m, 1),
-        flight_time_s=round(flight_time_s, 1),
-        energy_wh=round(energy_wh, 2),
-        budget_pct=round(budget_pct, 1),
+        flight_time_s=round(flight.flight_time_s, 1),
+        energy_wh=round(flight.energy_wh, 2),
+        budget_pct=round(flight.budget_pct, 1),
         terrain_resolution_m=getattr(dsm, "resolution_m", None),
         covered_area_m2=None,  # computed in plan.py from maneuver parameters
         smart_route_summary=smart_route_summary,

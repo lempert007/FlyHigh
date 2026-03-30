@@ -31,15 +31,10 @@ def points_in_polygon_utm(
     n = len(poly_e)
     j = n - 1
     for i in range(n):
-        cond = (
-            ((poly_n[i] > ny) != (poly_n[j] > ny))
-            & (
-                ex
-                < (poly_e[j] - poly_e[i])
-                * (ny - poly_n[i])
-                / (poly_n[j] - poly_n[i] + 1e-15)
-                + poly_e[i]
-            )
+        cond = ((poly_n[i] > ny) != (poly_n[j] > ny)) & (
+            ex
+            < (poly_e[j] - poly_e[i]) * (ny - poly_n[i]) / (poly_n[j] - poly_n[i] + 1e-15)
+            + poly_e[i]
         )
         inside ^= cond
         j = i
