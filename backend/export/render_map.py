@@ -9,6 +9,10 @@ import folium
 import folium.plugins
 import numpy as np
 
+import config
+
+_TILE_URL = config.TILE_URL_OFFLINE if config.OFFLINE_MAPS else config.TILE_URL_ONLINE
+
 from core.utm_utils import utm_to_latlon
 from models import FlightConfig
 
@@ -48,7 +52,12 @@ def render_map_html(
     center_lat = np.mean([ll[0] for ll in latlons])
     center_lon = np.mean([ll[1] for ll in latlons])
 
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="OpenStreetMap")
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=14,
+        tiles=_TILE_URL,
+        attr=config.TILE_ATTRIBUTION,
+    )
 
     # Per-segment slope (signed m/m); last point copies second-to-last.
     seg_slopes = np.zeros(len(altitudes))

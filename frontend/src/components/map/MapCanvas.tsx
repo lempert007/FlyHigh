@@ -1,4 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useSystemConfig } from "../../SystemConfigContext";
 import { Box, Button, Slide, Snackbar, Typography } from "@mui/material";
 import { ImageOverlay, MapContainer, Rectangle, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -219,6 +220,8 @@ export default function MapCanvas({
   mapFlyTarget,
   violations,
 }: MapCanvasProps) {
+  const { tileUrl, tileAttribution } = useSystemConfig();
+
   const placeMode: PlaceMode =
     interaction.mode === "polygon" ? "none" : (interaction.mode as PlaceMode);
   const polygonDrawPoiIndex = interaction.mode === "polygon" ? interaction.poiIndex : null;
@@ -363,8 +366,8 @@ export default function MapCanvas({
         style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution={tileAttribution}
+          url={tileUrl}
         />
 
         <ElevationLayers

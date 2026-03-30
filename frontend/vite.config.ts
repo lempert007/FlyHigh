@@ -23,6 +23,8 @@ export default defineConfig({
       "/presets": "http://localhost:8000",
       "/settings": "http://localhost:8000",
       "/dashboard": "http://localhost:8000",
+      "/tiles": "http://localhost:8000",
+      "/system-config": "http://localhost:8000",
     },
   },
 });

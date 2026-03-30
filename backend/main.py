@@ -25,6 +25,7 @@ from api.plan import router as plan_router
 from api.presets import router as presets_router
 from api.settings import router as settings_router
 from api.terrain import router as terrain_router
+from api.tiles import router as tiles_router
 from api.upload import router as upload_router
 from session import prune_expired_sessions
 
@@ -73,6 +74,7 @@ app.add_middleware(
     expose_headers=["X-Plan-Meta"],
 )
 
+app.include_router(tiles_router)
 app.include_router(upload_router)
 app.include_router(plan_router)
 app.include_router(terrain_router)
@@ -89,3 +91,9 @@ app.include_router(dashboard_router)
 def health() -> dict:
     """Simple liveness probe."""
     return {"status": "ok"}
+
+
+@app.get("/system-config")
+def system_config() -> dict:
+    """Expose deployment-time configuration to the frontend."""
+    return {"offline_maps": config.OFFLINE_MAPS}

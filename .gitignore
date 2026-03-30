@@ -11,6 +11,8 @@ build/
 venv/
 .env
 *.env
+maps/
+missions/
 
 # pytest / mypy / coverage
 .pytest_cache/

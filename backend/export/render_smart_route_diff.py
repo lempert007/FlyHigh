@@ -10,6 +10,10 @@ import html as _html
 
 import folium
 import numpy as np
+
+import config
+
+_TILE_URL = config.TILE_URL_OFFLINE if config.OFFLINE_MAPS else config.TILE_URL_ONLINE
 import plotly.graph_objects as go
 
 from core.route import compute_cumulative_distances
@@ -49,7 +53,12 @@ def render_smart_route_diff_html(
     center_lat = float(np.mean([ll[0] for ll in orig_ll]))
     center_lon = float(np.mean([ll[1] for ll in orig_ll]))
 
-    m = folium.Map(location=[center_lat, center_lon], zoom_start=14, tiles="OpenStreetMap")
+    m = folium.Map(
+        location=[center_lat, center_lon],
+        zoom_start=14,
+        tiles=_TILE_URL,
+        attr=config.TILE_ATTRIBUTION,
+    )
 
     # Original path — dashed grey
     folium.PolyLine(

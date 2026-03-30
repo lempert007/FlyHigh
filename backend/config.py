@@ -131,6 +131,21 @@ BATTERY_ERROR_PCT: float = 100.0
 SESSION_PRUNE_INTERVAL_S: int = 300
 """How often (seconds) the background task sweeps for and removes expired sessions."""
 
+# ── Map tiles ─────────────────────────────────────────────────────────────────
+OFFLINE_MAPS: bool = False
+"""When True, tiles are served from the local MBTiles file (backend/maps/tiles.mbtiles)
+and no internet connection is required. When False, tiles are fetched live from
+OpenStreetMap. Change this constant before launching the server."""
+
+TILE_URL_OFFLINE: str = "http://localhost:8000/tiles/{z}/{x}/{y}.png"
+"""Tile URL used when OFFLINE_MAPS is True — points at the local FastAPI tile server."""
+
+TILE_URL_ONLINE: str = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+"""Tile URL used when OFFLINE_MAPS is False — live OpenStreetMap CDN."""
+
+TILE_ATTRIBUTION: str = "Map data &copy; OpenStreetMap contributors"
+"""Attribution string used for both tile sources."""
+
 # ── TIFF library ───────────────────────────────────────────────────────────────
 TIFF_LIBRARY_PATH: _Path = _Path(__file__).parent / "maps"
 """Folder containing pre-loaded GeoTIFF terrain files available for selection."""
