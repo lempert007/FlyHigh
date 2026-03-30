@@ -20,6 +20,16 @@ export function haversineM(a: PointLike, b: PointLike): number {
   return R * 2 * Math.asin(Math.sqrt(x));
 }
 
+/** Forward azimuth from point a to point b in degrees (0–360, clockwise from North). */
+export function bearingDeg(a: PointLike, b: PointLike): number {
+  const lat1 = (toLat(a) * Math.PI) / 180;
+  const lat2 = (toLat(b) * Math.PI) / 180;
+  const dLon = ((toLon(b) - toLon(a)) * Math.PI) / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2);
+  const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+}
+
 /** Format a distance in metres as a human-readable string. */
 export function formatDist(m: number): string {
   return m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${Math.round(m)} m`;
