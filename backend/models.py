@@ -256,6 +256,9 @@ class PlanMeta(BaseModel):
     poi_scan_good_pct: float | None = (
         None  # % of POI scan points within product spec; None when no POIs
     )
+    rth_reserve_pct: float | None = None
+    """Estimated emergency RTH energy as % of total battery (straight-line from furthest waypoint).
+    None when the route has no waypoints. High values indicate limited abort margin."""
 
 
 # ── Mission library ───────────────────────────────────────────────────────────

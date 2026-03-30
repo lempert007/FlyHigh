@@ -91,8 +91,10 @@ export async function planRoute(
       throw new Error(parseErrorDetail(data, `Planning failed: ${res.status}`));
     }
     const blob = await res.blob();
-    const metaHeader = res.headers.get("X-Plan-Meta");
-    const meta: PlanMeta | null = metaHeader ? (JSON.parse(metaHeader) as PlanMeta) : null;
+    // Full meta (including violations) lives in meta.json inside the ZIP.
+    // The X-Plan-Meta header carries only the summary fields (no violations) to
+    // avoid hitting the Node.js HTTP header size limit on large violation lists.
+    const meta = await extractMetaFromZip(blob);
     return { blob, meta };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError")

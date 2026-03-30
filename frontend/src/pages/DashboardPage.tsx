@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSystemConfig } from "../SystemConfigContext";
 import { useNavigate } from "react-router-dom";
 import {
   Alert,
@@ -185,6 +186,7 @@ function StatusBadge({ status }: { status: MissionStatus }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const { tileUrl, tileAttribution } = useSystemConfig();
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -457,8 +459,8 @@ export default function DashboardPage() {
                     zoomControl
                   >
                     <TileLayer
-                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution={tileAttribution}
+                      url={tileUrl}
                     />
 
                     <MapFitBounds pins={validPins} />

@@ -133,6 +133,11 @@ def _try_split(
     Returns the *suffix* — the list of points from the first inserted split to end
     (never includes start itself).
     """
+    # Min-leg guard: stop recursing if the leg is too short to split productively.
+    # Sub-metre waypoints cannot satisfy terrain variation — Step 3 records the violation.
+    if approx_distance_m(start, end) < _config.SPLIT_MIN_LEG_M:
+        return [end], [action]
+
     band = band_at(_midpoint(start, end), poi_zones, global_band)
     profile = terrain.sample_leg(start, end, spacing)
     valley = profile.valley_elevation_msl()
@@ -148,7 +153,7 @@ def _try_split(
     if peak + band.min_agl_m <= valley + band.max_agl_m:
         return [end], [action]
 
-    if depth >= 3:
+    if depth >= _config.SPLIT_MAX_DEPTH:
         return [end], [action]  # give up; impossible-band violation recorded in Step 3
 
     mid = _midpoint(start, end)

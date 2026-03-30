@@ -11,6 +11,8 @@ build/
 venv/
 .env
 *.env
+maps/
+missions/
 
 # pytest / mypy / coverage
 .pytest_cache/
@@ -29,7 +31,7 @@ frontend/*.local
 Thumbs.db
 
 # IDE
-.vscode/
+
 .idea/
 *.swp
 *.swo

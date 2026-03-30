@@ -44,10 +44,37 @@ import { MissionTab } from "./components/sidebar/MissionTab";
 import { ConfigTab } from "./components/sidebar/ConfigTab";
 import { ResultsTab } from "./components/sidebar/ResultsTab";
 
+const MIN_SIDEBAR_W = 260;
+const MAX_SIDEBAR_FRACTION = 0.85;
+
 export default function App() {
   const { folder } = useParams<{ folder: string }>();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState(0);
+  const [sidebarWidth, setSidebarWidth] = useState(() => Math.round(window.innerWidth / 3));
+
+  const handleDragStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startW = sidebarWidth;
+      const onMove = (ev: MouseEvent) => {
+        setSidebarWidth(
+          Math.min(
+            Math.max(startW + ev.clientX - startX, MIN_SIDEBAR_W),
+            Math.round(window.innerWidth * MAX_SIDEBAR_FRACTION)
+          )
+        );
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [sidebarWidth]
+  );
   const tutorial = useTutorial();
 
   // Terrain / session state (session ID, overlays, tiff selections)
@@ -574,6 +601,21 @@ export default function App() {
           onTabChange={setActiveTab}
           onTourStart={tutorial.start}
           tourActive={tutorial.active}
+          width={sidebarWidth}
+        />
+
+        {/* Drag handle */}
+        <Box
+          onMouseDown={handleDragStart}
+          sx={{
+            width: 4,
+            flexShrink: 0,
+            cursor: "col-resize",
+            bgcolor: "#21262d",
+            transition: "background-color 0.15s",
+            "&:hover": { bgcolor: "#388bfd" },
+            zIndex: 10,
+          }}
         />
 
         <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>

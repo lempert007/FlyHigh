@@ -119,5 +119,5 @@ def render_3d_html(
         autosize=True,
     )
 
-    html_str = fig.to_html(full_html=True, include_plotlyjs="cdn", config={"responsive": True})
+    html_str = fig.to_html(full_html=True, include_plotlyjs=True, config={"responsive": True})
     return inject_dark_fullscreen_css(html_str)

@@ -131,6 +131,21 @@ BATTERY_ERROR_PCT: float = 100.0
 SESSION_PRUNE_INTERVAL_S: int = 300
 """How often (seconds) the background task sweeps for and removes expired sessions."""
 
+# ── Map tiles ─────────────────────────────────────────────────────────────────
+OFFLINE_MAPS: bool = False
+"""When True, tiles are served from the local MBTiles file (backend/maps/tiles.mbtiles)
+and no internet connection is required. When False, tiles are fetched live from
+OpenStreetMap. Change this constant before launching the server."""
+
+TILE_URL_OFFLINE: str = "http://localhost:8000/tiles/{z}/{x}/{y}.png"
+"""Tile URL used when OFFLINE_MAPS is True — points at the local FastAPI tile server."""
+
+TILE_URL_ONLINE: str = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+"""Tile URL used when OFFLINE_MAPS is False — live OpenStreetMap CDN."""
+
+TILE_ATTRIBUTION: str = "Map data &copy; OpenStreetMap contributors"
+"""Attribution string used for both tile sources."""
+
 # ── TIFF library ───────────────────────────────────────────────────────────────
 TIFF_LIBRARY_PATH: _Path = _Path(__file__).parent / "maps"
 """Folder containing pre-loaded GeoTIFF terrain files available for selection."""
@@ -147,6 +162,26 @@ is acceptable — the check is a product-quality concern, not a crash risk."""
 RAMP_SLOPE_TOLERANCE: float = 1.02
 """Multiplier applied to max_climb_slope before raising a slope violation.
 A 2% margin absorbs floating-point rounding so near-exact ramps don't warn."""
+
+# ── Terrain leg splitting ──────────────────────────────────────────────────────
+SPLIT_MAX_DEPTH: int = 3
+"""Maximum recursion depth for the impossible-band leg splitter (Step 2b).
+Each level halves the leg; at depth 3 an 80 m leg becomes 10 m half-segments.
+Increase for smoother profiles on very rugged terrain at the cost of more waypoints."""
+
+SPLIT_MIN_LEG_M: float = 5.0
+"""Minimum leg length (metres) below which Step 2b stops recursing.
+Prevents degenerate sub-metre waypoints on cliff-edge or quarry-wall terrain
+where terrain variation can never be satisfied regardless of how small the leg is."""
+
+# ── RTH battery reserve ────────────────────────────────────────────────────────
+RTH_ENERGY_MARGIN: float = 1.15
+"""Safety multiplier applied to the estimated emergency RTH energy.
+A 15% buffer accounts for headwind and battery degradation on the return leg."""
+
+RTH_WARNING_THRESHOLD_PCT: float = 20.0
+"""Warn if the emergency RTH reserve alone exceeds this percentage of total battery.
+Above 20% the mission leaves limited abort margin — operator should consider range."""
 
 
 def _validate() -> None:
