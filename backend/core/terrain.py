@@ -307,10 +307,20 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
     )
 
     logger.info("Reprojecting CRS -> UTM coordinate frame")
-    destination = np.empty((height, width), dtype=np.float64)
+    # Read the source band into memory before warping.
+    # Passing rasterio.band() directly lets GDAL mmap tiles on-demand during
+    # the warp, which fails on WSL2 (TIFFReadEncodedTile errors via 9P FS).
+    # Pre-loading into a numpy array avoids all mid-warp disk access.
+    # Keep native dtype — rasterio handles src/dst dtype mismatch internally,
+    # so no float64 copy is needed here (halves peak memory for float32 rasters).
+    # Keep native dtype for the source read (avoids an extra copy).
+    # Use float32 for the destination — elevation data needs no more than 7
+    # significant digits, and float32 halves peak RSS vs float64 here.
+    source_data = ds.read(1)
+    destination = np.empty((height, width), dtype=np.float32)
     nodata_val = ds.nodata if ds.nodata is not None else config.NODATA_FILL
     rasterio.warp.reproject(
-        source=rasterio.band(ds, 1),
+        source=source_data,
         destination=destination,
         src_transform=ds.transform,
         src_crs=src_crs,
@@ -322,7 +332,7 @@ def reproject_to_utm(ds: rasterio.DatasetReader) -> tuple[RegularGridInterpolato
     )
 
     if ds.nodata is not None:
-        destination[destination == ds.nodata] = np.nan
+        destination[np.isclose(destination, ds.nodata)] = np.nan
 
     pixel_size_e = abs(transform.a)
     pixel_size_n = abs(transform.e)

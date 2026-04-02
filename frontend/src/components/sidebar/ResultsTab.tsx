@@ -215,12 +215,22 @@ export function ResultsTab({
         />
       )}
 
-      <Divider />
-
-      <FlightPreviewPanel
-        flightPreview={flightPreview}
-        totalDistanceM={meta.total_distance_m ?? 0}
-      />
+      <Box
+        sx={{
+          position: "sticky",
+          bottom: -12, // offset the parent's p: 1.5 padding so it flush-sticks
+          bgcolor: "#0d1117",
+          pt: 1,
+          mt: "auto",
+          zIndex: 1,
+        }}
+      >
+        <Divider sx={{ mb: 1.5 }} />
+        <FlightPreviewPanel
+          flightPreview={flightPreview}
+          totalDistanceM={meta.total_distance_m ?? 0}
+        />
+      </Box>
     </>
   );
 }
