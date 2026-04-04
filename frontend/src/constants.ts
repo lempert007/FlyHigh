@@ -1,7 +1,8 @@
 /** Centralised constants — all magic numbers live here. */
 
 /** Tile URL used when the backend is configured with OFFLINE_MAPS = True. */
-export const TILE_URL_OFFLINE = "http://localhost:8000/tiles/{z}/{x}/{y}.png";
+const _apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+export const TILE_URL_OFFLINE = `${_apiUrl}/tiles/{z}/{x}/{y}.png`;
 
 /** Tile URL used when the backend is configured with OFFLINE_MAPS = False. */
 export const TILE_URL_ONLINE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
@@ -9,7 +10,6 @@ export const TILE_URL_ONLINE = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.p
 /** Shared attribution string for both tile sources. */
 export const TILE_ATTRIBUTION =
   'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-
 
 /** Canonical terrain raster types understood by the system. */
 export const TERRAIN_TYPES = ["DSM", "DTM"] as const;

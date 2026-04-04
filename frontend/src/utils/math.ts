@@ -42,10 +42,10 @@ export function formatTime(seconds: number): string {
   return `${m}m ${s}s`;
 }
 
-/** Format square metres: km² for large areas, ha for medium, m² for small. */
+/** Format square metres: km² for large areas, m² for small. */
 export function formatArea(m2: number): string {
   if (m2 >= 1_000_000) return `${(m2 / 1_000_000).toFixed(2)} km²`;
-  if (m2 >= 10_000) return `${(m2 / 10_000).toFixed(2)} ha`;
+  if (m2 >= 1_000) return `${(m2 / 1_000_000).toFixed(4)} km²`;
   return `${Math.round(m2).toLocaleString()} m²`;
 }
 

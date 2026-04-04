@@ -13,6 +13,7 @@ import type {
   PresetItem,
   DashboardStats,
   AppSettings,
+  SmartLawnmowerPreview,
 } from "../types/mission";
 
 interface PydanticError {
@@ -193,6 +194,12 @@ export async function fetchEditorData(sessionId: string): Promise<{
   waypoint_indices: number[] | null;
   bubble_peak_terrain: number[] | null;
   camera_min_terrain: number[] | null;
+  profile_points: Array<{
+    dist_m: number;
+    segment_type: string;
+    poi_id: number | null;
+    waypoint_id: number | null;
+  }> | null;
 }> {
   const res = await fetch(`/plan/${sessionId}/editor-data`);
   if (!res.ok) {
@@ -268,6 +275,12 @@ export async function fetchFolderEditorData(folder: string): Promise<{
   waypoint_indices: number[] | null;
   bubble_peak_terrain: number[] | null;
   camera_min_terrain: number[] | null;
+  profile_points: Array<{
+    dist_m: number;
+    segment_type: string;
+    poi_id: number | null;
+    waypoint_id: number | null;
+  }> | null;
 }> {
   const res = await fetch(`/missions/${encodeURIComponent(folder)}/editor-data`);
   if (!res.ok) {
@@ -434,6 +447,25 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 }
 
 /** Trigger a browser download of a Blob with the given filename. */
+export async function previewStripSpacing(
+  altAgl: number,
+  fovDeg: number,
+  overlap: number,
+  areaWidthM?: number
+): Promise<SmartLawnmowerPreview> {
+  const params = new URLSearchParams({
+    alt_agl: String(altAgl),
+    fov_deg: String(fovDeg),
+    overlap: String(overlap),
+  });
+  if (areaWidthM !== undefined) {
+    params.set("area_width_m", String(areaWidthM));
+  }
+  const res = await fetch(`/preview-strip-spacing?${params}`);
+  if (!res.ok) throw new Error(`Preview failed: ${res.status}`);
+  return res.json();
+}
+
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

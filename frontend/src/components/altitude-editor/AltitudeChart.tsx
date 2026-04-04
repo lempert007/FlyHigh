@@ -1,478 +1,288 @@
 /**
- * SVG altitude profile chart used inside the AltitudeEditorModal.
+ * Plotly-based altitude profile chart for the interactive altitude editor.
  *
- * Displays terrain, AGL band, POI blocks, segment bars, drone profile,
- * axes, and draggable handle circles.
+ * Renders terrain fill, safety/camera reference lines, AGL floor/ceiling,
+ * and the flight altitude trace. Zone backgrounds are coloured by segment type.
+ * Clicking a point selects it in the inspector panel.
  */
 
-import { useMemo } from "react";
-import type { AltNode } from "../../utils/altitudeEditorUtils";
-import type { validateAltitudes } from "../../utils/altitudeEditorUtils";
+import { useMemo, useCallback, useState } from "react";
+import createPlotlyComponent from "react-plotly.js/factory";
+// @ts-expect-error - plotly.js-basic-dist-min has no TS default export
+import Plotly from "plotly.js-basic-dist-min";
+import type { ProfilePoint } from "../../types/mission";
+import type { ValidationStatus } from "../../utils/altitudeEditorUtils";
+import { buildZoneShapes } from "../../utils/altitudeEditorUtils";
 
-// ── Layout constants ──────────────────────────────────────────────────────────
+const Plot = createPlotlyComponent(Plotly);
 
-export const SVG_W = 900;
-export const SVG_H = 380;
-export const PL = 48; // left padding (y-axis labels)
-export const PR = 16; // right padding
-export const PT = 16; // top padding
-export const PB = 28; // bottom padding (x-axis labels)
-export const CHART_W = SVG_W - PL - PR;
-export const CHART_H = SVG_H - PT - PB;
-
-export const HANDLE_R = 7;
-export const POI_HANDLE_R = 8;
-
-// ── Colors ────────────────────────────────────────────────────────────────────
-
-export const C_TERRAIN = "#6b4e2a";
-export const C_AGL_FILL = "rgba(0,200,83,0.12)";
-export const C_AGL_LINE = "rgba(0,200,83,0.35)";
-export const C_PROFILE = "#1E90FF";
-export const C_BELOW = "#ff5252";
-export const C_ABOVE = "#ff9100";
-export const C_POI_BG = "rgba(0,184,212,0.10)";
-export const C_POI_LINE = "rgba(0,184,212,0.4)";
-export const C_HANDLE = "#1E90FF";
-export const C_HANDLE_INS = "#00e676";
-export const C_LAND = "#aaa";
-export const C_AXIS = "#555";
-export const C_LABEL = "#6e7681";
-
-// ── DragState union ───────────────────────────────────────────────────────────
-
-export type DragState =
-  | { type: "handle"; id: string; altMin: number; altRange: number }
-  | {
-      type: "segment";
-      idA: string;
-      idB: string;
-      initialAltA: number;
-      initialAltB: number;
-      startSvgY: number;
-      hasMoved: boolean;
-      distA: number;
-      distB: number;
-      totalDist: number;
-      altMin: number;
-      altRange: number;
-      isDraggable: boolean;
-    };
-
-// ── SegmentBar ────────────────────────────────────────────────────────────────
-
-export interface SegmentBar {
-  key: string;
-  idA: string;
-  idB: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  distA: number;
-  distB: number;
-  isDraggable: boolean;
-}
-
-// ── Coordinate helpers ────────────────────────────────────────────────────────
-
-/**
- * Computes coordinate helpers from the ORIGINAL (algorithm) altitudes so the
- * Y-axis never rescales while the user is dragging handles.
- */
-export function makeScales(
-  totalDist: number,
-  origAlts: number[],
-  terrain: number[],
-  maxAgl: number
-) {
-  const altMin = Math.min(...origAlts, ...terrain) - 5;
-  const altMax = Math.max(...origAlts, ...terrain.map((t) => t + maxAgl)) + 10;
-  const altRange = altMax - altMin || 1;
-
-  const cx = (d: number) => PL + (d / totalDist) * CHART_W;
-  const cy = (a: number) => PT + CHART_H - ((a - altMin) / altRange) * CHART_H;
-  const toAlt = (svgY: number) => altMin + ((PT + CHART_H - svgY) / CHART_H) * altRange;
-  const toDist = (svgX: number) => ((svgX - PL) / CHART_W) * totalDist;
-
-  return { cx, cy, toAlt, toDist, altMin, altMax, altRange };
-}
-
-export function clientToSvg(clientX: number, clientY: number, svgEl: SVGSVGElement) {
-  const bbox = svgEl.getBoundingClientRect();
-  const scaleX = SVG_W / bbox.width;
-  const scaleY = SVG_H / bbox.height;
-  return { x: (clientX - bbox.left) * scaleX, y: (clientY - bbox.top) * scaleY };
-}
-
-// ── Chart component ───────────────────────────────────────────────────────────
-
-interface ChartProps {
-  origAlts: number[];
+interface AltitudeChartProps {
   terrain: number[];
   cumDists: number[];
-  reconAlt: number[];
-  validation: ReturnType<typeof validateAltitudes>;
-  nodes: AltNode[];
+  alts: number[];
+  aglProfile: number[];
   minBand: number[];
   maxBand: number[];
-  maxAgl: number;
-  dragState: DragState | null;
-  hoveredSegmentKey: string | null;
-  hoveredNodeId: string | null;
-  onHandlePointerDown: (e: React.PointerEvent<SVGCircleElement>, nodeId: string) => void;
-  onSegmentPointerDown: (e: React.PointerEvent<SVGLineElement>, seg: SegmentBar) => void;
-  onPointerMove: (e: React.PointerEvent<SVGSVGElement>) => void;
-  onPointerUp: (e: React.PointerEvent<SVGSVGElement>) => void;
-  onNodeDblClick: (nodeId: string, nodeType: AltNode["type"]) => void;
-  onSegmentHover: (key: string | null) => void;
-  onHandleHover: (id: string | null) => void;
+  validation: ValidationStatus[];
+  profilePoints: ProfilePoint[];
+  bubblePeakTerrain: number[] | null;
+  cameraMinTerrain: number[] | null;
+  selectedIdx: number | null;
+  selectedRangeEnd: number | null;
+  onSelectIdx: (idx: number | null) => void;
+  onSelectRangeEnd: (idx: number | null) => void;
 }
 
-export function AltitudeChart({
-  origAlts,
+const DARK_BG = "#0d1117";
+const GRID_COLOR = "#21262d";
+const TEXT_COLOR = "#c9d1d9";
+
+export default function AltitudeChart({
   terrain,
   cumDists,
-  reconAlt,
-  validation,
-  nodes,
+  alts,
+  aglProfile,
   minBand,
   maxBand,
-  maxAgl,
-  dragState,
-  hoveredSegmentKey,
-  hoveredNodeId,
-  onHandlePointerDown,
-  onSegmentPointerDown,
-  onPointerMove,
-  onPointerUp,
-  onNodeDblClick,
-  onSegmentHover,
-  onHandleHover,
-}: ChartProps) {
-  const totalDist = cumDists[cumDists.length - 1] || 1;
+  validation,
+  profilePoints,
+  bubblePeakTerrain,
+  cameraMinTerrain,
+  selectedIdx,
+  selectedRangeEnd,
+  onSelectIdx,
+  onSelectRangeEnd,
+}: AltitudeChartProps) {
+  const zoneShapes = useMemo(() => buildZoneShapes(profilePoints), [profilePoints]);
 
-  // Scale frozen to original altitudes — never changes during drag.
-  const scales = useMemo(
-    () => makeScales(totalDist, origAlts, terrain, maxAgl),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [totalDist, terrain, maxAgl]
-  );
-  const { cx, cy, altMin, altMax } = scales;
+  // Preserve zoom: capture axis ranges set by the user and pass them back into layout
+  const [savedXRange, setSavedXRange] = useState<[number, number] | null>(null);
+  const [savedYRange, setSavedYRange] = useState<[number, number] | null>(null);
 
-  // ── Terrain polygon ──────────────────────────────────────────────────────
-  const terrainPts = terrain.map((t, i) => `${cx(cumDists[i])},${cy(t)}`).join(" ");
-  const terrainPoly = `${cx(0)},${cy(altMin)} ${terrainPts} ${cx(totalDist)},${cy(altMin)}`;
-
-  // ── AGL band (per-point, supports POI overrides) ─────────────────────────
-  const minBandPts = terrain.map((t, i) => `${cx(cumDists[i])},${cy(t + minBand[i])}`).join(" ");
-  const maxBandPts = terrain.map((t, i) => `${cx(cumDists[i])},${cy(t + maxBand[i])}`).join(" ");
-  const maxBandPtsRev = terrain
-    .map((_t, i) => {
-      const ri = terrain.length - 1 - i;
-      return `${cx(cumDists[ri])},${cy(terrain[ri] + maxBand[ri])}`;
-    })
-    .join(" ");
-  const aglBandPoly = `${minBandPts} ${maxBandPtsRev}`;
-
-  // ── Drone profile segments coloured by validation ────────────────────────
-  type Seg = { pts: string; color: string };
-  const segments: Seg[] = [];
-  if (reconAlt.length > 1) {
-    let segPts = `${cx(cumDists[0])},${cy(reconAlt[0])}`;
-    let segColor =
-      validation[0] === "below" ? C_BELOW : validation[0] === "above" ? C_ABOVE : C_PROFILE;
-    for (let i = 1; i < reconAlt.length; i++) {
-      const c =
-        validation[i] === "below" ? C_BELOW : validation[i] === "above" ? C_ABOVE : C_PROFILE;
-      if (c !== segColor) {
-        segments.push({ pts: segPts, color: segColor });
-        segPts = `${cx(cumDists[i - 1])},${cy(reconAlt[i - 1])} `;
-        segColor = c;
-      }
-      segPts += ` ${cx(cumDists[i])},${cy(reconAlt[i])}`;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleRelayout = useCallback((eventData: any) => {
+    if (eventData["xaxis.range[0]"] !== undefined) {
+      setSavedXRange([eventData["xaxis.range[0]"], eventData["xaxis.range[1]"]]);
+    } else if (eventData["xaxis.autorange"] === true) {
+      setSavedXRange(null);
     }
-    segments.push({ pts: segPts, color: segColor });
-  }
+    if (eventData["yaxis.range[0]"] !== undefined) {
+      setSavedYRange([eventData["yaxis.range[0]"], eventData["yaxis.range[1]"]]);
+    } else if (eventData["yaxis.autorange"] === true) {
+      setSavedYRange(null);
+    }
+  }, []);
 
-  // ── Y-axis ticks ─────────────────────────────────────────────────────────
-  const yTicks = [altMin, (altMin + altMax) / 2, altMax].map((a) => ({
-    a: Math.round(a),
-    y: cy(a),
-  }));
+  const markerColors = useMemo(
+    () =>
+      alts.map((_, i) => {
+        if (i === selectedIdx) return "#00b0ff";
+        if (validation[i] === "below") return "#ff5252";
+        if (validation[i] === "above") return "#ff9100";
+        return "#388bfd";
+      }),
+    [alts, selectedIdx, validation]
+  );
 
-  // ── X-axis ticks ─────────────────────────────────────────────────────────
-  const xTicks = [0, totalDist / 2, totalDist].map((d) => ({
-    x: cx(d),
-    label: d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`,
-  }));
+  const markerSizes = useMemo(
+    () => alts.map((_, i) => (i === selectedIdx ? 10 : 4)),
+    [alts, selectedIdx]
+  );
 
-  // ── POI block rects ───────────────────────────────────────────────────────
-  const poiBlocks = nodes
-    .filter(
-      (n) => n.type === "poi" && n.poi_start_dist_m !== undefined && n.poi_end_dist_m !== undefined
-    )
-    .map((n) => {
-      const x1 = cx(n.poi_start_dist_m!);
-      const x2 = cx(n.poi_end_dist_m!);
-      return { id: n.id, x: x1, w: x2 - x1 };
+  const aglFloorY = useMemo(() => terrain.map((t, i) => t + (minBand[i] ?? 0)), [terrain, minBand]);
+
+  const aglCeilY = useMemo(() => terrain.map((t, i) => t + (maxBand[i] ?? 0)), [terrain, maxBand]);
+
+  const traces = useMemo(() => {
+    const t: object[] = [];
+
+    t.push({
+      x: cumDists,
+      y: terrain,
+      type: "scatter",
+      mode: "lines",
+      fill: "tozeroy",
+      fillcolor: "rgba(100,100,100,0.25)",
+      line: { color: "rgba(140,140,140,0.5)", width: 1 },
+      name: "Terrain",
+      hovertemplate: "%{y:.1f} m<extra>Terrain</extra>",
     });
 
-  // ── Handle positions ──────────────────────────────────────────────────────
-  const handles = nodes.map((n) => {
-    const closestIdx = cumDists.reduce(
-      (best, d, i) => (Math.abs(d - n.dist_m) < Math.abs(cumDists[best] - n.dist_m) ? i : best),
-      0
-    );
-    const altAtNode = reconAlt[closestIdx] ?? n.alt_m;
-    return { ...n, svgX: cx(n.dist_m), svgY: cy(altAtNode) };
-  });
-
-  // ── Segment bars between consecutive handles ──────────────────────────────
-  const segmentBars: SegmentBar[] = [];
-  for (let i = 0; i < handles.length - 1; i++) {
-    const a = handles[i];
-    const b = handles[i + 1];
-    const isDraggable =
-      a.type !== "start" && a.type !== "land" && b.type !== "start" && b.type !== "land";
-    segmentBars.push({
-      key: `${a.id}__${b.id}`,
-      idA: a.id,
-      idB: b.id,
-      x1: a.svgX,
-      y1: a.svgY,
-      x2: b.svgX,
-      y2: b.svgY,
-      distA: a.dist_m,
-      distB: b.dist_m,
-      isDraggable,
+    t.push({
+      x: cumDists,
+      y: aglFloorY,
+      type: "scatter",
+      mode: "lines",
+      line: { color: "rgba(0,230,118,0.5)", width: 1, dash: "dot" },
+      name: "Min AGL",
+      hovertemplate: "%{y:.1f} m<extra>Min AGL floor</extra>",
     });
-  }
 
-  // ── Cursor for SVG root ───────────────────────────────────────────────────
-  const svgCursor =
-    dragState?.type === "handle"
-      ? "grabbing"
-      : dragState?.type === "segment"
-        ? "ns-resize"
-        : "default";
+    t.push({
+      x: cumDists,
+      y: aglCeilY,
+      type: "scatter",
+      mode: "lines",
+      line: { color: "rgba(255,145,0,0.4)", width: 1, dash: "dot" },
+      name: "Max AGL",
+      hovertemplate: "%{y:.1f} m<extra>Max AGL ceiling</extra>",
+    });
+
+    if (bubblePeakTerrain) {
+      t.push({
+        x: cumDists,
+        y: bubblePeakTerrain,
+        type: "scatter",
+        mode: "lines",
+        line: { color: "rgba(255,145,0,0.7)", width: 1, dash: "dash" },
+        name: "Safety bubble peak",
+        hovertemplate: "%{y:.1f} m<extra>Safety bubble peak</extra>",
+      });
+    }
+
+    if (cameraMinTerrain) {
+      t.push({
+        x: cumDists,
+        y: cameraMinTerrain,
+        type: "scatter",
+        mode: "lines",
+        line: { color: "rgba(239,83,80,0.6)", width: 1, dash: "dash" },
+        name: "Camera min terrain",
+        hovertemplate: "%{y:.1f} m<extra>Camera min terrain</extra>",
+      });
+    }
+
+    // Flight altitude trace (always last — index used in click handler)
+    t.push({
+      x: cumDists,
+      y: alts,
+      type: "scatter",
+      mode: "lines+markers",
+      line: { color: "#e6edf3", width: 2 },
+      marker: { color: markerColors, size: markerSizes, symbol: "circle" },
+      name: "Flight altitude",
+      customdata: aglProfile,
+      hovertemplate: "Alt: %{y:.1f} m | AGL: %{customdata:.1f} m<extra>Flight</extra>",
+    });
+
+    return t;
+  }, [
+    cumDists,
+    terrain,
+    alts,
+    aglFloorY,
+    aglCeilY,
+    aglProfile,
+    bubblePeakTerrain,
+    cameraMinTerrain,
+    markerColors,
+    markerSizes,
+  ]);
+
+  const selectionShape = useMemo(() => {
+    if (selectedIdx === null || selectedIdx >= cumDists.length) return [];
+    // Range selected: filled rect between the two endpoints
+    if (selectedRangeEnd !== null && selectedRangeEnd !== selectedIdx) {
+      const lo = Math.min(selectedIdx, selectedRangeEnd);
+      const hi = Math.max(selectedIdx, selectedRangeEnd);
+      return [
+        {
+          type: "rect",
+          xref: "x",
+          yref: "paper",
+          x0: cumDists[lo],
+          x1: cumDists[hi],
+          y0: 0,
+          y1: 1,
+          fillcolor: "rgba(0,176,255,0.10)",
+          line: { color: "#00b0ff", width: 1 },
+          layer: "below",
+        },
+      ];
+    }
+    // Single point: dotted vertical line
+    return [
+      {
+        type: "line",
+        xref: "x",
+        yref: "paper",
+        x0: cumDists[selectedIdx],
+        x1: cumDists[selectedIdx],
+        y0: 0,
+        y1: 1,
+        line: { color: "#00b0ff", width: 1, dash: "dot" },
+      },
+    ];
+  }, [selectedIdx, selectedRangeEnd, cumDists]);
+
+  const layout = useMemo(
+    () => ({
+      paper_bgcolor: DARK_BG,
+      plot_bgcolor: DARK_BG,
+      margin: { l: 60, r: 20, t: 20, b: 50 },
+      xaxis: {
+        title: { text: "Distance (m)", font: { color: TEXT_COLOR, size: 12 } },
+        color: TEXT_COLOR,
+        gridcolor: GRID_COLOR,
+        zerolinecolor: "#30363d",
+        tickfont: { color: TEXT_COLOR, size: 11 },
+        ...(savedXRange ? { range: savedXRange, autorange: false } : {}),
+      },
+      yaxis: {
+        title: { text: "Altitude MSL (m)", font: { color: TEXT_COLOR, size: 12 } },
+        color: TEXT_COLOR,
+        gridcolor: GRID_COLOR,
+        zerolinecolor: "#30363d",
+        tickfont: { color: TEXT_COLOR, size: 11 },
+        ...(savedYRange ? { range: savedYRange, autorange: false } : {}),
+      },
+      legend: {
+        font: { color: TEXT_COLOR, size: 11 },
+        bgcolor: "rgba(13,17,23,0.8)",
+        bordercolor: GRID_COLOR,
+        borderwidth: 1,
+      },
+      dragmode: "zoom" as const,
+      shapes: [...zoneShapes, ...selectionShape],
+      hovermode: "closest" as const,
+    }),
+    [zoneShapes, selectionShape, savedXRange, savedYRange]
+  );
+
+  const handleClick = useCallback(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (event: any) => {
+      if (!event.points || event.points.length === 0) return;
+      const pt = event.points[0];
+      if (pt.curveNumber !== traces.length - 1) return;
+      const idx = pt.pointIndex as number;
+      const shiftHeld = (event.event as MouseEvent | undefined)?.shiftKey ?? false;
+      if (shiftHeld && selectedIdx !== null) {
+        // Shift-click: extend or clear the range
+        onSelectRangeEnd(idx === selectedRangeEnd ? null : idx);
+      } else {
+        // Normal click: set anchor, clear range
+        onSelectRangeEnd(null);
+        onSelectIdx(idx === selectedIdx ? null : idx);
+      }
+    },
+    [traces.length, selectedIdx, selectedRangeEnd, onSelectIdx, onSelectRangeEnd]
+  );
 
   return (
-    <svg
-      width="100%"
-      viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-      style={{ display: "block", overflow: "visible", cursor: svgCursor }}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-    >
-      {/* 1. Terrain */}
-      <polygon points={terrainPoly} fill={C_TERRAIN} opacity={0.55} />
-
-      {/* 2. AGL band fill + dotted lines */}
-      <polygon points={aglBandPoly} fill={C_AGL_FILL} />
-      <polyline
-        points={minBandPts}
-        fill="none"
-        stroke={C_AGL_LINE}
-        strokeWidth={1}
-        strokeDasharray="4 3"
-      />
-      <polyline
-        points={maxBandPts}
-        fill="none"
-        stroke={C_AGL_LINE}
-        strokeWidth={1}
-        strokeDasharray="4 3"
-      />
-
-      {/* 3. POI block backgrounds */}
-      {poiBlocks.map((b) => (
-        <rect
-          key={b.id}
-          x={b.x}
-          y={PT}
-          width={b.w}
-          height={CHART_H}
-          fill={C_POI_BG}
-          stroke={C_POI_LINE}
-          strokeWidth={1}
-          strokeDasharray="4 2"
-        />
-      ))}
-
-      {/* 4. Segment bars (visible line + fat transparent hit target) */}
-      {segmentBars.map((seg) => {
-        const hovered = hoveredSegmentKey === seg.key;
-        const isDragging =
-          dragState?.type === "segment" && dragState.idA === seg.idA && dragState.idB === seg.idB;
-        const active = hovered || isDragging;
-        return (
-          <g key={seg.key}>
-            {/* Visible bar */}
-            <line
-              x1={seg.x1}
-              y1={seg.y1}
-              x2={seg.x2}
-              y2={seg.y2}
-              stroke={C_PROFILE}
-              strokeWidth={active ? 6 : 3}
-              strokeOpacity={active ? 0.6 : 0.25}
-              strokeLinecap="round"
-              pointerEvents="none"
-            />
-            {/* Transparent fat hit target */}
-            <line
-              x1={seg.x1}
-              y1={seg.y1}
-              x2={seg.x2}
-              y2={seg.y2}
-              stroke="transparent"
-              strokeWidth={20}
-              style={{ cursor: seg.isDraggable ? "ns-resize" : "crosshair" }}
-              onPointerEnter={() => onSegmentHover(seg.key)}
-              onPointerLeave={() => onSegmentHover(null)}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                onSegmentPointerDown(e as unknown as React.PointerEvent<SVGLineElement>, seg);
-              }}
-            />
-          </g>
-        );
-      })}
-
-      {/* 5. Drone altitude profile (coloured by validation) */}
-      {segments.map((s, i) => (
-        <polyline
-          key={i}
-          points={s.pts}
-          fill="none"
-          stroke={s.color}
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-      ))}
-
-      {/* 6. Axes */}
-      <line x1={PL} y1={PT} x2={PL} y2={PT + CHART_H} stroke={C_AXIS} strokeWidth={1} />
-      <line
-        x1={PL}
-        y1={PT + CHART_H}
-        x2={PL + CHART_W}
-        y2={PT + CHART_H}
-        stroke={C_AXIS}
-        strokeWidth={1}
-      />
-
-      {/* Y-axis ticks */}
-      {yTicks.map(({ a, y }) => (
-        <g key={a}>
-          <line x1={PL - 4} y1={y} x2={PL} y2={y} stroke={C_AXIS} strokeWidth={1} />
-          <text x={PL - 6} y={y + 4} textAnchor="end" fontSize={9} fill={C_LABEL}>
-            {a}
-          </text>
-        </g>
-      ))}
-      <text
-        x={10}
-        y={PT + CHART_H / 2}
-        textAnchor="middle"
-        fontSize={9}
-        fill={C_LABEL}
-        transform={`rotate(-90,10,${PT + CHART_H / 2})`}
-      >
-        m MSL
-      </text>
-
-      {/* X-axis ticks */}
-      {xTicks.map(({ x, label }) => (
-        <g key={label}>
-          <line
-            x1={x}
-            y1={PT + CHART_H}
-            x2={x}
-            y2={PT + CHART_H + 4}
-            stroke={C_AXIS}
-            strokeWidth={1}
-          />
-          <text x={x} y={PT + CHART_H + 14} textAnchor="middle" fontSize={9} fill={C_LABEL}>
-            {label}
-          </text>
-        </g>
-      ))}
-
-      {/* 7. Handles */}
-      {handles.map((h) => {
-        const isPoi = h.type === "poi";
-        const isIns = h.type === "inserted";
-        const isFixed = h.type === "land" || h.type === "start";
-        const r = isPoi ? POI_HANDLE_R : HANDLE_R;
-        const fill = isIns
-          ? C_HANDLE_INS
-          : h.type === "land"
-            ? C_LAND
-            : isPoi
-              ? "#00bcd4"
-              : C_HANDLE;
-
-        const isHandleDragging =
-          (dragState?.type === "handle" && dragState.id === h.id) ||
-          (dragState?.type === "segment" && (dragState.idA === h.id || dragState.idB === h.id));
-        const isHovered = hoveredNodeId === h.id;
-        const showLabel = isHandleDragging || isHovered;
-
-        return (
-          <g key={h.id}>
-            {isHovered && !isHandleDragging && (
-              <circle
-                cx={h.svgX}
-                cy={h.svgY}
-                r={r + 4}
-                fill="none"
-                stroke="white"
-                strokeWidth={1.5}
-                opacity={0.3}
-              />
-            )}
-            {isHandleDragging && (
-              <circle cx={h.svgX} cy={h.svgY} r={r + 6} fill={fill} opacity={0.18} />
-            )}
-            <circle
-              cx={h.svgX}
-              cy={h.svgY}
-              r={r}
-              fill={fill}
-              stroke="#0d1117"
-              strokeWidth={1.5}
-              style={{ cursor: isFixed ? "default" : "grab" }}
-              onPointerEnter={() => onHandleHover(h.id)}
-              onPointerLeave={() => onHandleHover(null)}
-              onPointerDown={(e) => {
-                if (!isFixed) {
-                  e.stopPropagation();
-                  onHandlePointerDown(e as unknown as React.PointerEvent<SVGCircleElement>, h.id);
-                }
-              }}
-              onDoubleClick={(e) => {
-                e.stopPropagation();
-                onNodeDblClick(h.id, h.type);
-              }}
-            />
-            {showLabel && (
-              <text
-                x={h.svgX}
-                y={h.svgY - r - 6}
-                textAnchor="middle"
-                fontSize={9}
-                fill={fill}
-                fontWeight="bold"
-                style={{ pointerEvents: "none", userSelect: "none" }}
-              >
-                {Math.round(h.alt_m)} m
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
+    <Plot
+      data={traces as never[]}
+      layout={layout as never}
+      config={{
+        displayModeBar: true,
+        modeBarButtonsToRemove: ["sendDataToCloud"],
+        responsive: true,
+        displaylogo: false,
+      }}
+      style={{ width: "100%", height: "100%" }}
+      useResizeHandler
+      onClick={handleClick}
+      onRelayout={handleRelayout}
+    />
   );
 }

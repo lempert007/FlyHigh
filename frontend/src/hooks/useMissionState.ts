@@ -20,6 +20,8 @@ const DEFAULT_POI = (): Poi => ({
     width_m: 100,
     height_m: 100,
     sweep_spacing_m: 30,
+    smart_fov_deg: 60,
+    smart_overlap: 0.2,
     poi_min_agl_m: null,
     poi_max_agl_m: null,
   },

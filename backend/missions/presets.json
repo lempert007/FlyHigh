@@ -4,20 +4,38 @@
     "cruise_speed_ms": 15.0,
     "climb_rate_ms": 3.0,
     "battery_wh": 600.0,
-    "drone_weight_kg": 6.0
+    "drone_weight_kg": 6.0,
+    "min_agl_m": 80.0,
+    "max_agl_m": 150.0,
+    "point_radius_m": 100.0,
+    "max_surface_radius_m": 40.0,
+    "spacing_m": 20.0,
+    "min_altitude_step_m": 10.0
   },
   {
     "name": "Drone 2",
     "cruise_speed_ms": 15.0,
     "climb_rate_ms": 6.0,
     "battery_wh": 1550.0,
-    "drone_weight_kg": 2.5
+    "drone_weight_kg": 2.5,
+    "min_agl_m": null,
+    "max_agl_m": null,
+    "point_radius_m": null,
+    "max_surface_radius_m": null,
+    "spacing_m": null,
+    "min_altitude_step_m": null
   },
   {
     "name": "Fixed Wing 1",
     "cruise_speed_ms": 25.0,
     "climb_rate_ms": 4.0,
     "battery_wh": 300.0,
-    "drone_weight_kg": 1.5
+    "drone_weight_kg": 1.5,
+    "min_agl_m": null,
+    "max_agl_m": null,
+    "point_radius_m": null,
+    "max_surface_radius_m": null,
+    "spacing_m": null,
+    "min_altitude_step_m": null
   }
 ]

@@ -1,60 +1,78 @@
 /**
- * State management for the interactive altitude editor.
+ * State management for the Plotly-based altitude editor.
  *
- * Loads waypoints and AGL profile lazily from the ZIP blob when the editor
- * opens. Exposes a clean interface for dragging, inserting, removing nodes,
- * and resetting to the original algorithm output.
+ * Manages the full dense altitude array, undo/redo history, drag state, and apply/save.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import type { ProfilePoint, PlanMeta, Violation } from "../types/mission";
 import {
-  AltNode,
   WpPoint,
   PoiBand,
   ValidationStatus,
-  buildNodes,
   buildCumDists,
   buildAglBands,
-  reconstructAltitudes,
   validateAltitudes,
-  interpolateAltAtDist,
 } from "../utils/altitudeEditorUtils";
-import { fetchEditorData, fetchFolderEditorData } from "../api";
+import {
+  fetchEditorData,
+  fetchFolderEditorData,
+  applyAltitudeEdit,
+  applyFolderAltitudeEdit,
+} from "../api";
+
+const MAX_HISTORY = 50;
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
-export interface AltEditorData {
+export interface EditorData {
   wps: WpPoint[];
-  terrain: number[]; // terrain_elev[i] = wps[i].alt_m - aglProfile[i]
+  terrain: number[];
   cumDists: number[];
-  poiBands: PoiBand[]; // per-POI AGL band overrides (may be empty)
-  waypointIndices?: number[]; // dense-array indices for user-placed waypoints
-  bubblePeakTerrain?: number[]; // peak terrain within safety bubble disc at each point
-  cameraMinTerrain?: number[]; // min terrain within camera range disc at each point
+  poiBands: PoiBand[];
+  waypointIndices: number[];
+  bubblePeakTerrain: number[] | null;
+  cameraMinTerrain: number[] | null;
+  profilePoints: ProfilePoint[];
 }
 
 export interface UseAltitudeEditorReturn {
-  /** Loading state — true while reading the ZIP. */
   loading: boolean;
   loadError: string | null;
-  /** The full dense dataset (immutable after load). */
-  editorData: AltEditorData | null;
-  /** Sparse control nodes (mutable). */
-  nodes: AltNode[];
-  /** Reconstructed full altitude array (derived from nodes). */
-  reconAlt: number[];
-  /** Per-waypoint AGL validation status (derived). */
+  saving: boolean;
+  saveError: string | null;
+  editorData: EditorData | null;
+  /** Displayed altitude array (splices in live drag value). */
+  alts: number[];
+  aglProfile: number[];
   validation: ValidationStatus[];
-  /** Per-waypoint min/max AGL bands (accounting for POI overrides). */
   minBand: number[];
   maxBand: number[];
-  /** True if any node has been moved from its original altitude. */
-  isDirty: boolean;
-  dragNode: (id: string, newAlt: number) => void;
-  dragTwoNodes: (idA: string, altA: number, idB: string, altB: number) => void;
-  insertNode: (dist_m: number) => void;
-  removeNode: (id: string) => void;
+  selectedIdx: number | null;
+  /** End of a manually chosen range (shift-click). null = no range active. */
+  selectedRangeEnd: number | null;
+  dirty: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  /** Set the altitude of a single waypoint and push to history. */
+  setAlt: (idx: number, alt_m: number) => void;
+  /** Shift all waypoints in a POI zone by `delta` metres and push to history. */
+  adjustZone: (poiId: number, delta: number) => void;
+  /** Shift a single waypoint by `delta` metres (convenience over setAlt). */
+  nudge: (idx: number, delta: number) => void;
+  /** Shift all waypoints in [min(a,b), max(a,b)] by `delta` metres. */
+  adjustRange: (fromIdx: number, toIdx: number, delta: number) => void;
+  /** Set all waypoints in [min(a,b), max(a,b)] to the same absolute MSL altitude. */
+  setRangeAlt: (fromIdx: number, toIdx: number, alt_m: number) => void;
+  selectIdx: (idx: number | null) => void;
+  /** Violations produced by the most recent save. Empty until the first save. */
+  lastSaveViolations: Violation[];
+  /** Extend or clear the range end (shift-click). Setting to null also clears it. */
+  selectRangeEnd: (idx: number | null) => void;
+  undo: () => void;
+  redo: () => void;
   reset: () => void;
+  save: () => Promise<{ blob: Blob; meta: PlanMeta | null } | null>;
 }
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
@@ -68,14 +86,34 @@ export function useAltitudeEditor(
 ): UseAltitudeEditorReturn {
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [editorData, setEditorData] = useState<AltEditorData | null>(null);
-  const [nodes, setNodes] = useState<AltNode[]>([]);
-  const [insertCount, setInsertCount] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [editorData, setEditorData] = useState<EditorData | null>(null);
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [lastSaveViolations, setLastSaveViolations] = useState<Violation[]>([]);
 
-  // Load data from backend when modal opens
+  // History stack; historyIdx points to the current committed state
+  const history = useRef<number[][]>([]);
+  const historyIdx = useRef<number>(-1);
+  const [historyVersion, setHistoryVersion] = useState(0);
+
+  const currentAlts = (): number[] => {
+    if (historyIdx.current < 0 || history.current.length === 0) return [];
+    return history.current[historyIdx.current];
+  };
+
+  const pushHistory = useCallback((alts: number[]) => {
+    history.current = history.current.slice(0, historyIdx.current + 1);
+    history.current.push(alts);
+    if (history.current.length > MAX_HISTORY) history.current.shift();
+    historyIdx.current = history.current.length - 1;
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  // ── Load ────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (!open || (!sessionId && !folder)) return;
-    // Skip if already loaded
     if (editorData) return;
 
     let cancelled = false;
@@ -84,37 +122,33 @@ export function useAltitudeEditor(
 
     (async () => {
       try {
-        const data = sessionId
-          ? await fetchEditorData(sessionId)
-          : await fetchFolderEditorData(folder!);
+        const data = folder
+          ? await fetchFolderEditorData(folder)
+          : await fetchEditorData(sessionId!);
 
         const wps: WpPoint[] = data.waypoints;
         const aglProfile: number[] = data.agl_profile;
+        if (aglProfile.length !== wps.length) throw new Error("Waypoint/AGL length mismatch");
 
-        if (aglProfile.length !== wps.length) {
-          throw new Error("Waypoint and AGL profile length mismatch");
-        }
-
-        const poiBands: PoiBand[] = data.poi_bands ?? [];
-        const waypointIndices: number[] | undefined = data.waypoint_indices ?? undefined;
-        const bubblePeakTerrain: number[] | undefined = data.bubble_peak_terrain ?? undefined;
-        const cameraMinTerrain: number[] | undefined = data.camera_min_terrain ?? undefined;
         const terrain = wps.map((w, i) => w.alt_m - aglProfile[i]);
         const cumDists = buildCumDists(wps);
-        const initialNodes = buildNodes(wps, cumDists, waypointIndices);
+        const initialAlts = wps.map((w) => w.alt_m);
 
         if (!cancelled) {
           setEditorData({
             wps,
             terrain,
             cumDists,
-            poiBands,
-            waypointIndices,
-            bubblePeakTerrain,
-            cameraMinTerrain,
+            poiBands: data.poi_bands ?? [],
+            waypointIndices: data.waypoint_indices ?? [],
+            bubblePeakTerrain: data.bubble_peak_terrain ?? null,
+            cameraMinTerrain: data.camera_min_terrain ?? null,
+            profilePoints: (data.profile_points ?? []) as ProfilePoint[],
           });
-          setNodes(initialNodes);
-          setInsertCount(0);
+          history.current = [initialAlts];
+          historyIdx.current = 0;
+          setHistoryVersion(1);
+          setSelectedIdx(null);
           setLoading(false);
         }
       } catch (err) {
@@ -130,97 +164,204 @@ export function useAltitudeEditor(
     };
   }, [open, sessionId, folder]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset editorData when session or folder changes so next open re-loads fresh
+  // Reset when session/folder changes
   useEffect(() => {
     setEditorData(null);
-    setNodes([]);
+    history.current = [];
+    historyIdx.current = -1;
+    setHistoryVersion(0);
+    setSelectedIdx(null);
+    setSaveError(null);
   }, [sessionId, folder]);
 
-  // ── Derived state ──────────────────────────────────────────────────────────
+  // ── Derived state ───────────────────────────────────────────────────────────
 
-  const reconAlt: number[] = editorData
-    ? reconstructAltitudes(nodes, editorData.wps, editorData.cumDists)
-    : [];
+  const committedAlts = currentAlts();
 
-  const { minBand, maxBand } = editorData
-    ? buildAglBands(
-        editorData.cumDists,
-        editorData.terrain,
-        minAgl,
-        maxAgl,
-        editorData.poiBands,
-        editorData.bubblePeakTerrain,
-        editorData.cameraMinTerrain
-      )
-    : { minBand: [] as number[], maxBand: [] as number[] };
-
-  const validation: ValidationStatus[] = editorData
-    ? validateAltitudes(reconAlt, editorData.terrain, minBand, maxBand)
-    : [];
-
-  const isDirty = nodes.some((n) => n.alt_m !== n.alt_m_original || n.type === "inserted");
-
-  // ── Operations ─────────────────────────────────────────────────────────────
-
-  const dragNode = useCallback((id: string, newAlt: number) => {
-    setNodes((prev) => prev.map((n) => (n.id === id ? { ...n, alt_m: newAlt } : n)));
-  }, []);
-
-  // Move two nodes in one setState call — avoids intermediate renders during segment drag
-  const dragTwoNodes = useCallback((idA: string, altA: number, idB: string, altB: number) => {
-    setNodes((prev) =>
-      prev.map((n) =>
-        n.id === idA ? { ...n, alt_m: altA } : n.id === idB ? { ...n, alt_m: altB } : n
-      )
-    );
-  }, []);
-
-  const insertNode = useCallback(
-    (dist_m: number) => {
-      if (!editorData) return;
-      const alt = interpolateAltAtDist(nodes, editorData.wps, editorData.cumDists, dist_m);
-      const id = `inserted_${insertCount}`;
-      setInsertCount((c) => c + 1);
-      setNodes((prev) => {
-        const next: AltNode[] = [
-          ...prev,
-          { id, dist_m, alt_m: alt, alt_m_original: alt, type: "inserted" },
-        ];
-        return next.sort((a, b) => a.dist_m - b.dist_m);
-      });
-    },
-    [editorData, nodes, insertCount]
+  const { minBand, maxBand } = useMemo(
+    () =>
+      editorData
+        ? buildAglBands(
+            editorData.cumDists,
+            editorData.terrain,
+            minAgl,
+            maxAgl,
+            editorData.poiBands,
+            editorData.bubblePeakTerrain,
+            editorData.cameraMinTerrain
+          )
+        : { minBand: [] as number[], maxBand: [] as number[] },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editorData, minAgl, maxAgl, historyVersion]
   );
 
-  const removeNode = useCallback((id: string) => {
-    setNodes((prev) => prev.filter((n) => n.id !== id || n.type !== "inserted"));
+  const aglProfile = useMemo(
+    () => (editorData ? committedAlts.map((a, i) => a - editorData.terrain[i]) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editorData, historyVersion]
+  );
+
+  const validation: ValidationStatus[] = useMemo(
+    () =>
+      editorData ? validateAltitudes(committedAlts, editorData.terrain, minBand, maxBand) : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editorData, historyVersion, minBand, maxBand]
+  );
+
+  const originalAlts = history.current[0] ?? [];
+  const dirty =
+    historyIdx.current > 0 || committedAlts.some((a, i) => a !== (originalAlts[i] ?? a));
+
+  const canUndo = historyIdx.current > 0;
+  const canRedo = historyIdx.current < history.current.length - 1;
+
+  // ── Operations ──────────────────────────────────────────────────────────────
+
+  const setAlt = useCallback(
+    (idx: number, alt_m: number) => {
+      const prev = currentAlts();
+      if (prev.length === 0) return;
+      const next = [...prev];
+      next[idx] = alt_m;
+      pushHistory(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pushHistory, historyVersion]
+  );
+
+  const nudge = useCallback(
+    (idx: number, delta: number) => {
+      const prev = currentAlts();
+      if (prev.length === 0) return;
+      const next = [...prev];
+      next[idx] = prev[idx] + delta;
+      pushHistory(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pushHistory, historyVersion]
+  );
+
+  const adjustZone = useCallback(
+    (poiId: number, delta: number) => {
+      if (!editorData) return;
+      const prev = currentAlts();
+      if (prev.length === 0) return;
+      const next = [...prev];
+      for (let i = 0; i < editorData.profilePoints.length; i++) {
+        if (editorData.profilePoints[i].poi_id === poiId) {
+          next[i] = prev[i] + delta;
+        }
+      }
+      pushHistory(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [editorData, pushHistory, historyVersion]
+  );
+
+  const [selectedRangeEnd, setSelectedRangeEnd] = useState<number | null>(null);
+
+  const adjustRange = useCallback(
+    (fromIdx: number, toIdx: number, delta: number) => {
+      const prev = currentAlts();
+      if (prev.length === 0) return;
+      const lo = Math.min(fromIdx, toIdx);
+      const hi = Math.max(fromIdx, toIdx);
+      const next = [...prev];
+      for (let i = lo; i <= hi; i++) next[i] = prev[i] + delta;
+      pushHistory(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pushHistory, historyVersion]
+  );
+
+  const setRangeAlt = useCallback(
+    (fromIdx: number, toIdx: number, alt_m: number) => {
+      const prev = currentAlts();
+      if (prev.length === 0) return;
+      const lo = Math.min(fromIdx, toIdx);
+      const hi = Math.max(fromIdx, toIdx);
+      const next = [...prev];
+      for (let i = lo; i <= hi; i++) next[i] = alt_m;
+      pushHistory(next);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [pushHistory, historyVersion]
+  );
+
+  const selectIdx = useCallback((idx: number | null) => {
+    setSelectedIdx(idx);
+    if (idx === null) setSelectedRangeEnd(null);
+  }, []);
+
+  const selectRangeEnd = useCallback((idx: number | null) => setSelectedRangeEnd(idx), []);
+
+  const undo = useCallback(() => {
+    if (historyIdx.current <= 0) return;
+    historyIdx.current -= 1;
+    setHistoryVersion((v) => v + 1);
+  }, []);
+
+  const redo = useCallback(() => {
+    if (historyIdx.current >= history.current.length - 1) return;
+    historyIdx.current += 1;
+    setHistoryVersion((v) => v + 1);
   }, []);
 
   const reset = useCallback(() => {
-    if (!editorData) return;
-    const initialNodes = buildNodes(
-      editorData.wps,
-      editorData.cumDists,
-      editorData.waypointIndices
-    );
-    setNodes(initialNodes);
-    setInsertCount(0);
-  }, [editorData]);
+    if (history.current.length === 0) return;
+    history.current = [history.current[0]];
+    historyIdx.current = 0;
+    setHistoryVersion((v) => v + 1);
+    setSelectedIdx(null);
+  }, []);
+
+  const save = useCallback(async (): Promise<{ blob: Blob; meta: PlanMeta | null } | null> => {
+    const curAlts = currentAlts();
+    if (curAlts.length === 0) return null;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const result = folder
+        ? await applyFolderAltitudeEdit(folder, curAlts)
+        : await applyAltitudeEdit(sessionId!, curAlts);
+      setLastSaveViolations(result?.meta?.violations ?? []);
+      return result;
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : String(err));
+      return null;
+    } finally {
+      setSaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, folder, historyVersion]);
 
   return {
     loading,
     loadError,
+    saving,
+    saveError,
     editorData,
-    nodes,
-    reconAlt,
+    alts: committedAlts,
+    aglProfile,
     validation,
     minBand,
     maxBand,
-    isDirty,
-    dragNode,
-    dragTwoNodes,
-    insertNode,
-    removeNode,
+    selectedIdx,
+    selectedRangeEnd,
+    lastSaveViolations,
+    dirty,
+    canUndo,
+    canRedo,
+    setAlt,
+    nudge,
+    adjustZone,
+    adjustRange,
+    setRangeAlt,
+    selectIdx,
+    selectRangeEnd,
+    undo,
+    redo,
     reset,
+    save,
   };
 }

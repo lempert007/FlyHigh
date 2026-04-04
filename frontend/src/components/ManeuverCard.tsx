@@ -1,11 +1,14 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Box,
+  Chip,
+  CircularProgress,
   Collapse,
   Grid,
   IconButton,
   InputAdornment,
   Paper,
+  Slider,
   Stack,
   TextField,
   ToggleButton,
@@ -18,11 +21,13 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import type { Poi } from "../types/mission";
+import type { Poi, SmartLawnmowerPreview } from "../types/mission";
+import { previewStripSpacing } from "../api";
 
 interface ManeuverCardProps {
   index: number;
   poi: Poi;
+  globalMaxAgl: number;
   onChange: (index: number, updated: Poi) => void;
   onRemove: (index: number) => void;
   onActivatePlace: (index: number) => void;
@@ -34,6 +39,7 @@ interface ManeuverCardProps {
 export default function ManeuverCard({
   index,
   poi,
+  globalMaxAgl,
   onChange,
   onRemove,
   onActivatePlace,
@@ -44,6 +50,8 @@ export default function ManeuverCard({
   const [aglOpen, setAglOpen] = useState(
     poi.maneuver.poi_min_agl_m != null || poi.maneuver.poi_max_agl_m != null
   );
+  const [preview, setPreview] = useState<SmartLawnmowerPreview | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   const updateName = useCallback(
     (val: string) => onChange(index, { ...poi, name: val }),
@@ -71,6 +79,43 @@ export default function ManeuverCard({
 
   const { maneuver, point } = poi;
   const hasAglOverride = maneuver.poi_min_agl_m != null || maneuver.poi_max_agl_m != null;
+  const isSmartLawnmower = maneuver.type === "smart_lawnmower";
+
+  const fovDeg = maneuver.smart_fov_deg ?? 60;
+  const overlap = maneuver.smart_overlap ?? 0.2;
+
+  // Fetch strip spacing preview whenever smart_lawnmower params change
+  useEffect(() => {
+    if (!isSmartLawnmower) {
+      setPreview(null);
+      return;
+    }
+    let cancelled = false;
+    const altAgl = maneuver.poi_max_agl_m ?? globalMaxAgl;
+    const areaWidth = maneuver.polygon ? undefined : maneuver.width_m;
+    setPreviewLoading(true);
+    previewStripSpacing(altAgl, fovDeg, overlap, areaWidth)
+      .then((p) => {
+        if (!cancelled) setPreview(p);
+      })
+      .catch(() => {
+        if (!cancelled) setPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isSmartLawnmower,
+    fovDeg,
+    overlap,
+    maneuver.poi_max_agl_m,
+    globalMaxAgl,
+    maneuver.polygon,
+    maneuver.width_m,
+  ]);
 
   const mAdornment = (
     <InputAdornment position="end">
@@ -181,6 +226,7 @@ export default function ManeuverCard({
           >
             <ToggleButton value="lawnmower">Lawnmower</ToggleButton>
             <ToggleButton value="warp_weft">Warp & Weft</ToggleButton>
+            <ToggleButton value="smart_lawnmower">Smart</ToggleButton>
           </ToggleButtonGroup>
 
           <Tooltip
@@ -203,8 +249,8 @@ export default function ManeuverCard({
           </Tooltip>
         </Stack>
 
-        {/* ── Dimensions ── */}
-        {!maneuver.polygon ? (
+        {/* ── Dimensions (lawnmower / warp_weft) ── */}
+        {!isSmartLawnmower && !maneuver.polygon && (
           <Stack direction="row" alignItems="center" spacing={1}>
             <TextField
               size="small"
@@ -240,7 +286,9 @@ export default function ManeuverCard({
               sx={{ flex: 1 }}
             />
           </Stack>
-        ) : (
+        )}
+
+        {!isSmartLawnmower && maneuver.polygon && (
           <Stack direction="row" alignItems="center" spacing={1}>
             <TextField
               size="small"
@@ -266,6 +314,153 @@ export default function ManeuverCard({
               clear polygon
             </Typography>
           </Stack>
+        )}
+
+        {/* ── Smart Lawnmower params ── */}
+        {isSmartLawnmower && (
+          <Box>
+            {/* Area dimensions (no polygon) */}
+            {!maneuver.polygon && (
+              <Stack direction="row" alignItems="center" spacing={1} mb={1.5}>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Width"
+                  value={maneuver.width_m}
+                  onChange={(e) => updateManeuver("width_m", e.target.value)}
+                  inputProps={{ step: 10, min: 10 }}
+                  InputProps={{ endAdornment: mAdornment }}
+                  sx={{ flex: 1 }}
+                />
+                <Typography color="text.disabled" sx={{ pb: 0.25 }}>
+                  ×
+                </Typography>
+                <TextField
+                  size="small"
+                  type="number"
+                  label="Height"
+                  value={maneuver.height_m}
+                  onChange={(e) => updateManeuver("height_m", e.target.value)}
+                  inputProps={{ step: 10, min: 10 }}
+                  InputProps={{ endAdornment: mAdornment }}
+                  sx={{ flex: 1 }}
+                />
+              </Stack>
+            )}
+
+            {maneuver.polygon && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: "text.disabled",
+                  cursor: "pointer",
+                  "&:hover": { color: "error.main" },
+                  display: "block",
+                  mb: 1,
+                }}
+                onClick={() => updateManeuver("polygon", null)}
+              >
+                clear polygon
+              </Typography>
+            )}
+
+            {/* FOV input */}
+            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+              <TextField
+                size="small"
+                type="number"
+                label="Camera FOV"
+                value={fovDeg}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v) && v > 0 && v < 180) updateManeuver("smart_fov_deg", v);
+                }}
+                inputProps={{ step: 5, min: 10, max: 170 }}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Typography variant="caption" color="text.disabled">
+                        °
+                      </Typography>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ width: 120 }}
+              />
+              <Box sx={{ flex: 1 }}>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography variant="caption" color="text.secondary">
+                    Overlap
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {Math.round(overlap * 100)}%
+                  </Typography>
+                </Stack>
+                <Slider
+                  size="small"
+                  value={overlap}
+                  min={0}
+                  max={0.75}
+                  step={0.05}
+                  onChange={(_, v) => updateManeuver("smart_overlap", v as number)}
+                  sx={{ py: 0.5 }}
+                />
+              </Box>
+            </Stack>
+
+            {/* Live preview readout */}
+            <Box
+              sx={{
+                bgcolor: "action.hover",
+                borderRadius: 1,
+                px: 1.25,
+                py: 0.75,
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 32,
+              }}
+            >
+              {previewLoading ? (
+                <CircularProgress size={14} sx={{ color: "text.disabled" }} />
+              ) : preview ? (
+                <>
+                  <Typography variant="caption" color="text.secondary">
+                    precise spacing {preview.precise_spacing_m} m
+                  </Typography>
+                  <Typography variant="caption" color="text.disabled">
+                    ·
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    overlap spacing {preview.overlap_spacing_m} m
+                  </Typography>
+                  {preview.estimated_strips != null && (
+                    <>
+                      <Typography variant="caption" color="text.disabled">
+                        ·
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        ~{preview.estimated_strips} strips
+                      </Typography>
+                    </>
+                  )}
+                  {preview.warning && (
+                    <Chip
+                      label="clamped"
+                      size="small"
+                      color="warning"
+                      variant="outlined"
+                      sx={{ height: 18, fontSize: "0.65rem" }}
+                    />
+                  )}
+                </>
+              ) : (
+                <Typography variant="caption" color="text.disabled">
+                  —
+                </Typography>
+              )}
+            </Box>
+          </Box>
         )}
 
         {/* ── Height override ── */}

@@ -3,6 +3,7 @@ import {
   Alert,
   Box,
   Button,
+  Collapse,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -16,6 +17,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -192,6 +194,58 @@ function PresetNumField({
   );
 }
 
+function OptionalNumField({
+  label,
+  unit,
+  value,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: number | null | undefined;
+  onChange: (v: number | null) => void;
+}) {
+  return (
+    <TextField
+      label={label}
+      size="small"
+      type="number"
+      value={value ?? ""}
+      placeholder="—"
+      onChange={(e) => {
+        if (e.target.value === "") {
+          onChange(null);
+          return;
+        }
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n)) onChange(n);
+      }}
+      inputProps={{ min: 0, step: "any" }}
+      InputProps={{
+        endAdornment: (
+          <InputAdornment position="end">
+            <Typography sx={{ fontSize: "0.7rem", color: "#6e7681" }}>{unit}</Typography>
+          </InputAdornment>
+        ),
+      }}
+      sx={{
+        flex: 1,
+        minWidth: 110,
+        "& .MuiOutlinedInput-root": {
+          bgcolor: "#0d1117",
+          fontSize: "0.8rem",
+          color: "#cdd9e5",
+          "& fieldset": { borderColor: "#30363d" },
+          "&:hover fieldset": { borderColor: "#444c56" },
+          "&.Mui-focused fieldset": { borderColor: "#1E90FF" },
+        },
+        "& .MuiInputLabel-root": { fontSize: "0.72rem", color: "#6e7681" },
+        "& .MuiInputLabel-root.Mui-focused": { color: "#1E90FF" },
+      }}
+    />
+  );
+}
+
 function PresetRowEditor({
   row,
   isOnly,
@@ -203,9 +257,27 @@ function PresetRowEditor({
   onChange: (u: PresetRow) => void;
   onDelete: () => void;
 }) {
+  const [overridesOpen, setOverridesOpen] = useState(
+    row.min_agl_m != null ||
+      row.max_agl_m != null ||
+      row.point_radius_m != null ||
+      row.max_surface_radius_m != null ||
+      row.spacing_m != null ||
+      row.min_altitude_step_m != null
+  );
+
   function field<K extends keyof PresetRow>(key: K) {
     return (val: PresetRow[K]) => onChange({ ...row, [key]: val });
   }
+
+  const hasOverrides =
+    row.min_agl_m != null ||
+    row.max_agl_m != null ||
+    row.point_radius_m != null ||
+    row.max_surface_radius_m != null ||
+    row.spacing_m != null ||
+    row.min_altitude_step_m != null;
+
   return (
     <Box
       sx={{
@@ -254,6 +326,8 @@ function PresetRowEditor({
           </span>
         </Tooltip>
       </Box>
+
+      {/* Required fields */}
       <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
         <PresetNumField
           label="Cruise speed"
@@ -280,6 +354,81 @@ function PresetRowEditor({
           onChange={field("drone_weight_kg")}
         />
       </Box>
+
+      {/* Optional flight config overrides */}
+      <Box
+        onClick={() => setOverridesOpen((v) => !v)}
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: 0.5,
+          cursor: "pointer",
+          userSelect: "none",
+          width: "fit-content",
+        }}
+      >
+        <Typography
+          variant="caption"
+          sx={{ color: hasOverrides ? "#1E90FF" : "#6e7681", fontSize: "0.72rem" }}
+        >
+          Flight config overrides
+        </Typography>
+        <ExpandMoreIcon
+          sx={{
+            fontSize: 14,
+            color: hasOverrides ? "#1E90FF" : "#6e7681",
+            transform: overridesOpen ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform 0.15s",
+          }}
+        />
+      </Box>
+      <Collapse in={overridesOpen}>
+        <Typography
+          variant="caption"
+          sx={{ color: "#6e7681", fontSize: "0.68rem", display: "block", mb: 1 }}
+        >
+          Leave blank to use the global default. Values here are applied when the preset is
+          selected.
+        </Typography>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+          <OptionalNumField
+            label="Min AGL"
+            unit="m"
+            value={row.min_agl_m}
+            onChange={field("min_agl_m")}
+          />
+          <OptionalNumField
+            label="Max AGL"
+            unit="m"
+            value={row.max_agl_m}
+            onChange={field("max_agl_m")}
+          />
+          <OptionalNumField
+            label="Safety radius"
+            unit="m"
+            value={row.point_radius_m}
+            onChange={field("point_radius_m")}
+          />
+          <OptionalNumField
+            label="Camera range"
+            unit="m"
+            value={row.max_surface_radius_m}
+            onChange={field("max_surface_radius_m")}
+          />
+          <OptionalNumField
+            label="Route resolution"
+            unit="m"
+            value={row.spacing_m}
+            onChange={field("spacing_m")}
+          />
+          <OptionalNumField
+            label="Min alt step"
+            unit="m"
+            value={row.min_altitude_step_m}
+            onChange={field("min_altitude_step_m")}
+          />
+        </Box>
+      </Collapse>
     </Box>
   );
 }

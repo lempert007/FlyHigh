@@ -103,6 +103,9 @@ export interface MissionTabProps {
 
   // Live estimates
   liveEstimates: LiveEstimates | null;
+
+  // For smart lawnmower preview
+  globalMaxAgl: number;
 }
 
 /** Left-border accent: grey idle, blue in-progress, green done. */
@@ -182,6 +185,7 @@ export function MissionTab(props: MissionTabProps) {
     onPoiDrop,
     onAddPoi,
     liveEstimates,
+    globalMaxAgl,
   } = props;
 
   const placeMode = interaction.mode === "polygon" ? "none" : interaction.mode;
@@ -432,6 +436,7 @@ export function MissionTab(props: MissionTabProps) {
         />
         <PoiSection
           pois={pois}
+          globalMaxAgl={globalMaxAgl}
           onPoiChange={onPoiChange}
           onPoiRemove={onPoiRemove}
           onPoiActivatePlace={onPoiActivatePlace}

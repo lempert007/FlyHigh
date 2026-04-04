@@ -54,6 +54,7 @@ def patch_plan_zip(
                 ViolationInfo(
                     point_index=i,
                     kind="terrain_band",
+                    category="safety",
                     description=f"Below minimum AGL: {agl:.1f} m (min {min_agl_m:.1f} m)",
                     lat=float(lats[i]),
                     lon=float(lons[i]),
@@ -64,6 +65,7 @@ def patch_plan_zip(
                 ViolationInfo(
                     point_index=i,
                     kind="surface_warning",
+                    category="product_route",
                     description=f"Above maximum AGL: {agl:.1f} m (max {max_agl_m:.1f} m)",
                     lat=float(lats[i]),
                     lon=float(lons[i]),

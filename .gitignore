@@ -9,8 +9,6 @@ dist/
 build/
 .venv/
 venv/
-.env
-*.env
 maps/
 missions/
 

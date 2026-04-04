@@ -24,7 +24,7 @@ class PointLatLon(BaseModel):
 
 
 class ManeuverConfig(BaseModel):
-    type: Literal["lawnmower", "warp_weft"] = "lawnmower"
+    type: Literal["lawnmower", "warp_weft", "smart_lawnmower"] = "lawnmower"
 
     # lawnmower / warp_weft params
     width_m: float = Field(
@@ -35,6 +35,19 @@ class ManeuverConfig(BaseModel):
     )
     sweep_spacing_m: float = Field(
         default=30.0, ge=30, description="Distance between adjacent sweep strips in metres"
+    )
+
+    # smart_lawnmower params (ignored for other maneuver types)
+    smart_fov_deg: float = Field(
+        default_factory=lambda: config.DEFAULT_SMART_FOV_DEG,
+        gt=0,
+        lt=180,
+        description="Camera horizontal FOV in degrees for smart lawnmower strip-spacing computation",
+    )
+    smart_overlap: float = Field(
+        default_factory=lambda: config.DEFAULT_SMART_OVERLAP,
+        ge=0.0,
+        description="Strip overlap fraction [0, SMART_LAWNMOWER_MAX_OVERLAP) for smart lawnmower",
     )
 
     # per-POI altitude override (None = use global FlightConfig value)
@@ -59,6 +72,11 @@ class ManeuverConfig(BaseModel):
             raise ValueError("poi_min_agl_m and poi_max_agl_m must both be set or both be unset")
         if has_min and has_max and self.poi_min_agl_m >= self.poi_max_agl_m:  # type: ignore[operator]
             raise ValueError("poi_min_agl_m must be strictly less than poi_max_agl_m")
+        if self.smart_overlap >= config.SMART_LAWNMOWER_MAX_OVERLAP:
+            raise ValueError(
+                f"smart_overlap must be < {config.SMART_LAWNMOWER_MAX_OVERLAP} "
+                f"(got {self.smart_overlap})"
+            )
         return self
 
 
@@ -315,6 +333,13 @@ class PresetItem(BaseModel):
     climb_rate_ms: float = Field(..., gt=0)
     battery_wh: float = Field(..., gt=0)
     drone_weight_kg: float = Field(..., gt=0)
+    # Optional flight config overrides — None means "don't override, use global default"
+    min_agl_m: float | None = Field(default=None, gt=0)
+    max_agl_m: float | None = Field(default=None, gt=0)
+    point_radius_m: float | None = Field(default=None, ge=0)
+    max_surface_radius_m: float | None = Field(default=None, ge=0)
+    spacing_m: float | None = Field(default=None, gt=0)
+    min_altitude_step_m: float | None = Field(default=None, ge=0)
 
 
 # ── Dashboard aggregates ──────────────────────────────────────────────────────
@@ -389,6 +414,16 @@ class AppSettings(BaseModel):
         if self.battery_warning_pct > self.battery_error_pct:
             raise ValueError("battery_warning_pct must not exceed battery_error_pct")
         return self
+
+
+# ── Altitude editor ───────────────────────────────────────────────────────────
+
+
+class ProfilePoint(BaseModel):
+    dist_m: float
+    segment_type: str  # "transit" | "poi_scan" | "waypoint"
+    poi_id: int | None = None  # 0-based index into req.pois if in a POI zone
+    waypoint_id: int | None = None  # 0-based index into req.waypoints if at a waypoint
 
 
 # ── Waypoint output (one element of waypoints.json array) ────────────────────

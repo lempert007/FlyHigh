@@ -24,16 +24,25 @@ export const INTERACTION_RESET: InteractionState = {
   polygonVertices: [],
 };
 
-export type ManeuverType = "lawnmower" | "warp_weft";
+export type ManeuverType = "lawnmower" | "warp_weft" | "smart_lawnmower";
 
 export interface Maneuver {
   type: ManeuverType;
   width_m: number;
   height_m: number;
   sweep_spacing_m: number;
+  smart_fov_deg: number;
+  smart_overlap: number;
   poi_min_agl_m: number | null;
   poi_max_agl_m: number | null;
   polygon?: LatLon[];
+}
+
+export interface SmartLawnmowerPreview {
+  precise_spacing_m: number;
+  overlap_spacing_m: number;
+  estimated_strips: number | null;
+  warning: string | null;
 }
 
 export interface Poi {
@@ -119,6 +128,14 @@ export interface PlanMeta {
   min_agl_m?: number;
   max_agl_m?: number;
   poi_scan_good_pct?: number;
+  rth_reserve_pct?: number;
+}
+
+export interface ProfilePoint {
+  dist_m: number;
+  segment_type: "transit" | "poi_scan" | "waypoint";
+  poi_id: number | null;
+  waypoint_id: number | null;
 }
 
 export type MissionStatus = "draft" | "ready" | "flown";
@@ -168,6 +185,13 @@ export interface PresetItem {
   climb_rate_ms: number;
   battery_wh: number;
   drone_weight_kg: number;
+  // Optional flight config overrides
+  min_agl_m?: number | null;
+  max_agl_m?: number | null;
+  point_radius_m?: number | null;
+  max_surface_radius_m?: number | null;
+  spacing_m?: number | null;
+  min_altitude_step_m?: number | null;
 }
 
 // ── Dashboard analytics ───────────────────────────────────────────────────────

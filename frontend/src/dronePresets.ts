@@ -6,7 +6,18 @@ export interface DronePreset {
   config: Pick<
     FlightConfig,
     "cruise_speed_ms" | "climb_rate_ms" | "battery_wh" | "drone_weight_kg"
-  >;
+  > &
+    Partial<
+      Pick<
+        FlightConfig,
+        | "min_agl_m"
+        | "max_agl_m"
+        | "point_radius_m"
+        | "max_surface_radius_m"
+        | "spacing_m"
+        | "min_altitude_step_m"
+      >
+    >;
 }
 
 export const DRONE_PRESETS: DronePreset[] = [

@@ -192,28 +192,40 @@ export default function App() {
   // Convert API presets to DronePreset shape; fall back to built-in if none loaded
   const dronePresets: DronePreset[] = useMemo(() => {
     if (apiPresets.length === 0) return DRONE_PRESETS;
-    return apiPresets.map((p) => ({
-      label: p.name,
-      description: "",
-      config: {
+    return apiPresets.map((p) => {
+      const config: DronePreset["config"] = {
         cruise_speed_ms: p.cruise_speed_ms,
         climb_rate_ms: p.climb_rate_ms,
         battery_wh: p.battery_wh,
         drone_weight_kg: p.drone_weight_kg,
-      },
-    }));
+      };
+      if (p.min_agl_m != null) config.min_agl_m = p.min_agl_m;
+      if (p.max_agl_m != null) config.max_agl_m = p.max_agl_m;
+      if (p.point_radius_m != null) config.point_radius_m = p.point_radius_m;
+      if (p.max_surface_radius_m != null) config.max_surface_radius_m = p.max_surface_radius_m;
+      if (p.spacing_m != null) config.spacing_m = p.spacing_m;
+      if (p.min_altitude_step_m != null) config.min_altitude_step_m = p.min_altitude_step_m;
+      return { label: p.name, description: "", config };
+    });
   }, [apiPresets]);
 
   // Derive the active preset name for persisting with the mission
   const activePresetName = useMemo(() => {
     for (const p of apiPresets) {
-      if (
+      const matches =
         p.cruise_speed_ms === flightConfig.cruise_speed_ms &&
         p.climb_rate_ms === flightConfig.climb_rate_ms &&
         p.battery_wh === flightConfig.battery_wh &&
-        p.drone_weight_kg === flightConfig.drone_weight_kg
-      )
-        return p.name;
+        p.drone_weight_kg === flightConfig.drone_weight_kg &&
+        (p.min_agl_m == null || p.min_agl_m === flightConfig.min_agl_m) &&
+        (p.max_agl_m == null || p.max_agl_m === flightConfig.max_agl_m) &&
+        (p.point_radius_m == null || p.point_radius_m === flightConfig.point_radius_m) &&
+        (p.max_surface_radius_m == null ||
+          p.max_surface_radius_m === flightConfig.max_surface_radius_m) &&
+        (p.spacing_m == null || p.spacing_m === flightConfig.spacing_m) &&
+        (p.min_altitude_step_m == null ||
+          p.min_altitude_step_m === flightConfig.min_altitude_step_m);
+      if (matches) return p.name;
     }
     return null;
   }, [apiPresets, flightConfig]);
@@ -510,6 +522,7 @@ export default function App() {
           onPoiDrop={mission.handlePoiDrop}
           onAddPoi={mission.handleAddPoi}
           liveEstimates={liveEstimates}
+          globalMaxAgl={flightConfig.max_agl_m}
         />
       ),
     },

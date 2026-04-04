@@ -12,6 +12,7 @@ import math
 
 import numpy as np
 
+import config as _config
 from core.geometry import points_in_polygon_utm
 from core.types import AltitudeBand, LatLon, PoiZone
 from core.utm_utils import latlon_to_utm, utm_to_latlon_obj
@@ -21,6 +22,39 @@ logger = logging.getLogger(__name__)
 
 MIN_SWEEP_SPACING_M: float = 1.0
 """Minimum allowed sweep spacing. Values below this collapse strips into a single point."""
+
+
+# ── Camera geometry ───────────────────────────────────────────────────────────
+
+
+def compute_precise_spacing(h: float, fov_deg: float) -> float:
+    """Ground footprint width (m) for a nadir camera at height h above ground.
+
+    Args:
+        h: altitude above ground in metres (must be > 0).
+        fov_deg: horizontal field of view in degrees (must be in (0, 180)).
+
+    Returns:
+        Precise spacing (footprint width) in metres: 2 * h * tan(fov/2).
+    """
+    if h <= 0 or not (0 < fov_deg < 180):
+        raise ValueError(f"Invalid inputs to compute_precise_spacing: h={h}, fov_deg={fov_deg}")
+    return 2.0 * h * math.tan(math.radians(fov_deg / 2.0))
+
+
+def compute_overlap_spacing(precise_spacing: float, overlap: float) -> float:
+    """Strip centre-line spacing (m) after applying overlap to the precise spacing.
+
+    Args:
+        precise_spacing: ground footprint width in metres.
+        overlap: fraction of footprint covered by the adjacent strip [0, 1).
+
+    Returns:
+        Centre-to-centre overlap spacing: precise_spacing * (1 - overlap).
+    """
+    if not (0.0 <= overlap < 1.0):
+        raise ValueError(f"Overlap must be in [0, 1), got {overlap}")
+    return precise_spacing * (1.0 - overlap)
 
 
 # ── Rectangle lawnmower ───────────────────────────────────────────────────────
@@ -86,6 +120,84 @@ def generate_warp_and_weft_pattern(
     warp = generate_lawnmower_pattern(center, width_m, height_m, sweep_spacing_m, 0.0)
     weft = generate_lawnmower_pattern(center, height_m, width_m, sweep_spacing_m, 90.0)
     return warp + weft
+
+
+# ── Smart lawnmower ──────────────────────────────────────────────────────────
+
+
+def generate_smart_lawnmower_pattern(
+    center: LatLon,
+    width_m: float,
+    height_m: float,
+    h: float,
+    fov_deg: float,
+    overlap: float,
+    entry_bearing_deg: float = 0.0,
+) -> list[LatLon]:
+    """Rectangle lawnmower with strip spacing derived from camera FOV and overlap.
+
+    Computes spacing via :func:`compute_precise_spacing` and
+    :func:`compute_overlap_spacing`, then delegates entirely to
+    :func:`generate_lawnmower_pattern`.
+
+    Args:
+        center: POI centre point.
+        width_m: coverage width (cross-track) in metres.
+        height_m: coverage height (along-track) in metres.
+        h: AGL altitude in metres (resolves at dispatch: poi_max_agl override or global max_agl).
+        fov_deg: camera horizontal FOV in degrees.
+        overlap: strip overlap fraction [0, SMART_LAWNMOWER_MAX_OVERLAP).
+        entry_bearing_deg: bearing rotation forwarded to the lawnmower generator.
+
+    Returns:
+        Same list[LatLon] as :func:`generate_lawnmower_pattern`.
+    """
+    precise_spacing = compute_precise_spacing(h, fov_deg)
+    overlap_spacing = compute_overlap_spacing(precise_spacing, overlap)
+
+    if overlap_spacing < _config.SMART_LAWNMOWER_MIN_SPACING_M:
+        logger.warning(
+            "Smart lawnmower: computed overlap spacing %.2f m is below minimum %.1f m — clamped. "
+            "(h=%.1f m, fov=%.1f°, overlap=%.2f)",
+            overlap_spacing,
+            _config.SMART_LAWNMOWER_MIN_SPACING_M,
+            h,
+            fov_deg,
+            overlap,
+        )
+        overlap_spacing = _config.SMART_LAWNMOWER_MIN_SPACING_M
+
+    return generate_lawnmower_pattern(center, width_m, height_m, overlap_spacing, entry_bearing_deg)
+
+
+def generate_smart_lawnmower_polygon_pattern(
+    polygon_latlon: list,
+    h: float,
+    fov_deg: float,
+    overlap: float,
+    zone_str: str,
+    *,
+    prefer_start: LatLon | None = None,
+) -> list[LatLon]:
+    """Polygon lawnmower with strip spacing derived from camera FOV and overlap.
+
+    Mirrors :func:`generate_smart_lawnmower_pattern` but for arbitrary polygons.
+    Delegates to :func:`generate_lawnmower_polygon_pattern`.
+    """
+    precise_spacing = compute_precise_spacing(h, fov_deg)
+    overlap_spacing = compute_overlap_spacing(precise_spacing, overlap)
+
+    if overlap_spacing < _config.SMART_LAWNMOWER_MIN_SPACING_M:
+        logger.warning(
+            "Smart lawnmower (polygon): computed overlap spacing %.2f m is below minimum %.1f m — clamped.",
+            overlap_spacing,
+            _config.SMART_LAWNMOWER_MIN_SPACING_M,
+        )
+        overlap_spacing = _config.SMART_LAWNMOWER_MIN_SPACING_M
+
+    return generate_lawnmower_polygon_pattern(
+        polygon_latlon, overlap_spacing, zone_str, prefer_start=prefer_start
+    )
 
 
 # ── Polygon lawnmower ─────────────────────────────────────────────────────────
@@ -297,7 +409,7 @@ def build_poi_zone(
     # Resolve boundary polygon
     if m.polygon:
         boundary = tuple(LatLon(lat=v.lat, lon=v.lon) for v in m.polygon)
-    elif m.type == "lawnmower":
+    elif m.type in ("lawnmower", "smart_lawnmower"):
         # Rotate the bounding rectangle to match the lawnmower sweep direction.
         # warp_weft generates two axis-aligned passes (0° and 90°) so no rotation needed.
         boundary = _rectangle_boundary(

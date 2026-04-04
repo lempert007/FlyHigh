@@ -82,17 +82,40 @@ LAWNMOWER_TURN_OVERLAP: float = 0.10
 """Extra overlap fraction added at strip turns to avoid coverage gaps."""
 
 # ── Mission library ───────────────────────────────────────────────────────────
+import os as _os
 from pathlib import Path as _Path
+
+# Load .env file if present — no-op in production where env vars are injected directly.
+_env_file = _Path(__file__).parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _, _v = _line.partition("=")
+            _os.environ.setdefault(_k.strip(), _v.strip())
 
 MISSIONS_ROOT: _Path = _Path(__file__).parent / "missions"
 """Root folder where mission sub-directories are stored."""
 
 # ── Session management ────────────────────────────────────────────────────────
-SESSION_TTL_SECONDS: int = 3600
+SESSION_TTL_SECONDS: int = 1500
 """How long an upload session is kept alive in memory before being pruned."""
 
 MAX_SESSIONS: int = 50
 """Hard cap on concurrent sessions. Oldest session is evicted when exceeded."""
+
+# ── Smart Lawnmower ──────────────────────────────────────────────────────────
+DEFAULT_SMART_FOV_DEG: float = 60.0
+"""Default camera horizontal field-of-view (degrees) used by the smart lawnmower."""
+
+DEFAULT_SMART_OVERLAP: float = 0.20
+"""Default strip overlap fraction (0–1) for the smart lawnmower."""
+
+SMART_LAWNMOWER_MAX_OVERLAP: float = 0.80
+"""Maximum allowed overlap fraction for the smart lawnmower."""
+
+SMART_LAWNMOWER_MIN_SPACING_M: float = 2.0
+"""Minimum strip spacing (m) for the smart lawnmower. Computed spacing is clamped to this value."""
 
 # ── Smart Route ───────────────────────────────────────────────────────────────
 SMART_ROUTE_CORRIDOR_M: float = 50.0
@@ -137,8 +160,11 @@ OFFLINE_MAPS: bool = False
 and no internet connection is required. When False, tiles are fetched live from
 OpenStreetMap. Change this constant before launching the server."""
 
-TILE_URL_OFFLINE: str = "http://localhost:8000/tiles/{z}/{x}/{y}.png"
-"""Tile URL used when OFFLINE_MAPS is True — points at the local FastAPI tile server."""
+TILE_URL_OFFLINE: str = _os.getenv(
+    "TILE_URL_OFFLINE", "http://localhost:8000/tiles/{z}/{x}/{y}.png"
+)
+"""Tile URL used when OFFLINE_MAPS is True — points at the local FastAPI tile server.
+Override via TILE_URL_OFFLINE env var in production."""
 
 TILE_URL_ONLINE: str = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 """Tile URL used when OFFLINE_MAPS is False — live OpenStreetMap CDN."""

@@ -32,7 +32,7 @@ import JSZip from "jszip";
 import { downloadBlob } from "../api";
 import { haversineM, formatTime, getBatteryColor } from "../utils/math";
 import type { PlanMeta } from "../types/mission";
-import AltitudeEditorModal from "./AltitudeEditorModal";
+import AltitudeEditorView from "./altitude-editor/AltitudeEditorView";
 
 interface AltWaypoint {
   lat: number;
@@ -785,7 +785,7 @@ export default function ResultsPanel({
           >
             Edit Altitudes Manually
           </Button>
-          <AltitudeEditorModal
+          <AltitudeEditorView
             open={altEditorOpen}
             onClose={() => setAltEditorOpen(false)}
             sessionId={sessionId ?? null}

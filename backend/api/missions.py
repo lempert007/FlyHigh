@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import json
+import math
 import os
 import zipfile
 
@@ -15,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 import session as session_store
+from api.editor_data import _build_profile_points
 from core.altitude_edit_utils import patch_plan_zip
 from core.missions import (
     _plan_zip_path,
@@ -151,6 +153,31 @@ async def get_mission_editor_data(folder: str) -> dict:
                 if "camera_min_terrain.json" in names
                 else None
             )
+
+        # Derive POI block starts from action strings
+        _POI_BLOCK_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower"})
+        poi_indices: list[int] = []
+        prev_in_poi = False
+        for i, wp in enumerate(wps):
+            in_poi = wp.get("action", "") in _POI_BLOCK_ACTIONS
+            if in_poi and not prev_in_poi:
+                poi_indices.append(i)
+            prev_in_poi = in_poi
+
+        # Build cumulative distances for profile points
+        _R = 6_371_000
+        cum_dists_list = [0.0]
+        for i in range(1, len(wps)):
+            lat1, lon1 = wps[i - 1]["lat"], wps[i - 1]["lon"]
+            lat2, lon2 = wps[i]["lat"], wps[i]["lon"]
+            phi1, phi2 = math.radians(lat1), math.radians(lat2)
+            dphi = math.radians(lat2 - lat1)
+            dlam = math.radians(lon2 - lon1)
+            a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+            cum_dists_list.append(cum_dists_list[-1] + _R * 2 * math.asin(math.sqrt(a)))
+
+        profile_points = _build_profile_points(wps, cum_dists_list, poi_indices, wp_indices or [])
+
         return {
             "waypoints": wps,
             "agl_profile": agl,
@@ -158,6 +185,7 @@ async def get_mission_editor_data(folder: str) -> dict:
             "waypoint_indices": wp_indices,
             "bubble_peak_terrain": bubble_peak,
             "camera_min_terrain": camera_min,
+            "profile_points": profile_points,
         }
     except KeyError:
         raise HTTPException(
@@ -238,6 +266,7 @@ async def put_mission(folder: str, req: SaveMissionRequest) -> dict:
         "created_at": existing.get("created_at", ""),
         "tiff_selections": [s.model_dump() for s in req.tiff_selections],
         "route": req.route,
+        "preset_name": req.preset_name,
     }
     save_mission(folder, data)
     return {"ok": True}

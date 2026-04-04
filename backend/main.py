@@ -23,6 +23,7 @@ from api.missions import router as missions_router
 from api.pdf import router as pdf_router
 from api.plan import router as plan_router
 from api.presets import router as presets_router
+from api.preview import router as preview_router
 from api.settings import router as settings_router
 from api.terrain import router as terrain_router
 from api.tiles import router as tiles_router
@@ -85,6 +86,7 @@ app.include_router(missions_router)
 app.include_router(presets_router)
 app.include_router(settings_router)
 app.include_router(dashboard_router)
+app.include_router(preview_router)
 
 
 @app.get("/health")

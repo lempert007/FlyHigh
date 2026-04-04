@@ -6,6 +6,7 @@ import ManeuverCard from "../ManeuverCard";
 
 interface PoiSectionProps {
   pois: Poi[];
+  globalMaxAgl: number;
   onPoiChange: (index: number, updated: Poi) => void;
   onPoiRemove: (index: number) => void;
   onPoiActivatePlace: (index: number) => void;
@@ -18,6 +19,7 @@ interface PoiSectionProps {
 /** POIs & Maneuvers list with ManeuverCards and an Add POI button. */
 export function PoiSection({
   pois,
+  globalMaxAgl,
   onPoiChange,
   onPoiRemove,
   onPoiActivatePlace,
@@ -38,6 +40,7 @@ export function PoiSection({
             key={poi.id}
             index={i}
             poi={poi}
+            globalMaxAgl={globalMaxAgl}
             onChange={onPoiChange}
             onRemove={onPoiRemove}
             onActivatePlace={onPoiActivatePlace}

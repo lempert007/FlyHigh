@@ -36,6 +36,8 @@ from core.poi import (
     compute_entry_bearing,
     generate_lawnmower_pattern,
     generate_lawnmower_polygon_pattern,
+    generate_smart_lawnmower_pattern,
+    generate_smart_lawnmower_polygon_pattern,
     generate_warp_and_weft_pattern,
 )
 from core.route import (
@@ -71,8 +73,8 @@ from models import FlightConfig, PlanMeta, POIConfig, RouteRequest, ViolationInf
 logger = logging.getLogger(__name__)
 
 # Actions that indicate a dense waypoint is inside a POI scan area
-_POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft"})
-_POI_MANEUVER_ACTIONS = {"poi", "lawnmower", "warp_weft", "ramp_start"}
+_POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower"})
+_POI_MANEUVER_ACTIONS = {"poi", "lawnmower", "warp_weft", "smart_lawnmower", "ramp_start"}
 
 
 # ── Stage dataclasses ─────────────────────────────────────────────────────────
@@ -820,6 +822,15 @@ def _expand_maneuver_latlon(
             )
             return wps_a + wps_b
         return generate_warp_and_weft_pattern(center, m.width_m, m.height_m, m.sweep_spacing_m)
+    if m.type == "smart_lawnmower":
+        h = m.poi_max_agl_m if m.poi_max_agl_m is not None else params.max_agl_m
+        if m.polygon:
+            return generate_smart_lawnmower_polygon_pattern(
+                m.polygon, h, m.smart_fov_deg, m.smart_overlap, zone_str, prefer_start=prev_point
+            )
+        return generate_smart_lawnmower_pattern(
+            center, m.width_m, m.height_m, h, m.smart_fov_deg, m.smart_overlap, entry_bearing
+        )
     return []
 
 

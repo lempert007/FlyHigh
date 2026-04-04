@@ -14,6 +14,55 @@ import session as session_store
 
 router = APIRouter(prefix="/plan", tags=["editor-data"])
 
+_POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower", "ramp_start"})
+
+
+def _build_profile_points(
+    waypoints_list: list[dict],
+    cum_dists: list[float],
+    poi_indices: list[int],
+    waypoint_indices: list[int],
+) -> list[dict]:
+    """Compute per-waypoint segment metadata for the altitude editor chart."""
+    poi_starts = sorted(poi_indices)
+    wp_index_map = {idx: j for j, idx in enumerate(waypoint_indices)}
+
+    result: list[dict] = []
+    for i, wp in enumerate(waypoints_list):
+        action = wp.get("action", "")
+        dist_m = round(float(cum_dists[i]), 2) if i < len(cum_dists) else 0.0
+
+        if action in _POI_ACTIONS:
+            # Find the last POI block that started at or before this index
+            poi_id: int | None = None
+            for j, start in enumerate(poi_starts):
+                if i >= start:
+                    poi_id = j
+            result.append(
+                {
+                    "dist_m": dist_m,
+                    "segment_type": "poi_scan",
+                    "poi_id": poi_id,
+                    "waypoint_id": None,
+                }
+            )
+        elif action == "waypoint":
+            waypoint_id = wp_index_map.get(i)
+            result.append(
+                {
+                    "dist_m": dist_m,
+                    "segment_type": "waypoint",
+                    "poi_id": None,
+                    "waypoint_id": waypoint_id,
+                }
+            )
+        else:
+            result.append(
+                {"dist_m": dist_m, "segment_type": "transit", "poi_id": None, "waypoint_id": None}
+            )
+
+    return result
+
 
 @router.get("/{session_id}/editor-data")
 async def get_editor_data(session_id: str) -> dict:
@@ -26,6 +75,13 @@ async def get_editor_data(session_id: str) -> dict:
             status_code=409,
             detail="Waypoint data not available — re-plan the route to enable editing.",
         )
+
+    profile_points = _build_profile_points(
+        data.waypoints_list,
+        data.cum_dists.tolist(),
+        data.poi_indices,
+        data.waypoint_indices,
+    )
 
     return {
         "waypoints": data.waypoints_list,
@@ -42,4 +98,5 @@ async def get_editor_data(session_id: str) -> dict:
             if data.camera_min_terrain is not None
             else None
         ),
+        "profile_points": profile_points,
     }
