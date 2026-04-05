@@ -21,6 +21,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import MyLocationIcon from "@mui/icons-material/MyLocation";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import { ManeuverType } from "../types/mission";
 import type { Poi, SmartLawnmowerPreview } from "../types/mission";
 import { previewStripSpacing } from "../api";
 
@@ -79,7 +80,7 @@ export default function ManeuverCard({
 
   const { maneuver, point } = poi;
   const hasAglOverride = maneuver.poi_min_agl_m != null || maneuver.poi_max_agl_m != null;
-  const isSmartLawnmower = maneuver.type === "smart_lawnmower";
+  const isSmartLawnmower = maneuver.type === ManeuverType.SMART_LAWNMOWER;
 
   const fovDeg = maneuver.smart_fov_deg ?? 60;
   const overlap = maneuver.smart_overlap ?? 0.2;
@@ -224,9 +225,9 @@ export default function ManeuverCard({
               },
             }}
           >
-            <ToggleButton value="lawnmower">Lawnmower</ToggleButton>
-            <ToggleButton value="warp_weft">Warp & Weft</ToggleButton>
-            <ToggleButton value="smart_lawnmower">Smart</ToggleButton>
+            <ToggleButton value={ManeuverType.LAWNMOWER}>Lawnmower</ToggleButton>
+            <ToggleButton value={ManeuverType.WARP_WEFT}>Warp & Weft</ToggleButton>
+            <ToggleButton value={ManeuverType.SMART_LAWNMOWER}>Smart</ToggleButton>
           </ToggleButtonGroup>
 
           <Tooltip

@@ -30,6 +30,7 @@ from core.missions import (
     save_mission,
     save_plan,
 )
+from core.types import POI_SCAN_ACTIONS
 from export.packager import strip_internal_files
 from models import (
     AltEditBody,
@@ -155,11 +156,10 @@ async def get_mission_editor_data(folder: str) -> dict:
             )
 
         # Derive POI block starts from action strings
-        _POI_BLOCK_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower"})
         poi_indices: list[int] = []
         prev_in_poi = False
         for i, wp in enumerate(wps):
-            in_poi = wp.get("action", "") in _POI_BLOCK_ACTIONS
+            in_poi = wp.get("action", "") in POI_SCAN_ACTIONS
             if in_poi and not prev_in_poi:
                 poi_indices.append(i)
             prev_in_poi = in_poi

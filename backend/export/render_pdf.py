@@ -22,6 +22,7 @@ from export.render_pdf_charts import (
     route_overview_png,
     terrain_map_png,
 )
+from models import ManeuverType
 from session import LastPlanData
 
 # ── Fonts ─────────────────────────────────────────────────────────────────────
@@ -725,7 +726,11 @@ def _poi_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
         agl_min = m.poi_min_agl_m if m.poi_min_agl_m is not None else data.fc.min_agl_m
         agl_max = m.poi_max_agl_m if m.poi_max_agl_m is not None else data.fc.max_agl_m
         poi_dist = data.poi_distances[j] if j < len(data.poi_distances) else None
-        maneuver_label = "Lawnmower" if m.type == "lawnmower" else "Warp & Weft"
+        maneuver_label = {
+            ManeuverType.LAWNMOWER: "Lawnmower",
+            ManeuverType.WARP_WEFT: "Warp & Weft",
+            ManeuverType.SMART_LAWNMOWER: "Smart Lawnmower",
+        }.get(m.type, m.type)
         poly_note = " (custom polygon)" if m.polygon else ""
 
         rows = [

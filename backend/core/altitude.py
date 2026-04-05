@@ -29,6 +29,7 @@ import config as _config
 from core.band import band_at, find_zone_crossings
 from core.terrain import TerrainIndex
 from core.types import (
+    Action,
     AltitudeBand,
     FlightParams,
     LatLon,
@@ -160,7 +161,7 @@ def _try_split(
     left_pts, left_acts = _try_split(
         start,
         mid,
-        "terrain_split",
+        Action.TERRAIN_SPLIT,
         poi_zones,
         global_band,
         terrain,
@@ -251,7 +252,7 @@ def _insert_ramp_pins(
         pin_alt = worst_elev + band.min_agl_m
         result_points.insert(i, pin_pt)
         result_altitudes.insert(i, pin_alt)
-        result_actions.insert(i, "ramp_pin")
+        result_actions.insert(i, Action.RAMP_PIN)
         # Re-check from i-1 → new pin (don't advance i).
 
 
@@ -324,11 +325,11 @@ def plan_altitude_profile(
         )
         for crossing in crossings:
             expanded_points.append(crossing.point)
-            expanded_actions.append("zone_crossing")
+            expanded_actions.append(Action.ZONE_CROSSING)
         expanded_points.append(leg_end)
         expanded_actions.append(waypoint_actions[i])
 
-    n_crossings = sum(1 for a in expanded_actions if a == "zone_crossing")
+    n_crossings = sum(1 for a in expanded_actions if a == Action.ZONE_CROSSING)
     logger.info(
         "Step 2a — zone crossings: %d band-change waypoints inserted (%d input → %d expanded)",
         n_crossings,
@@ -350,7 +351,7 @@ def plan_altitude_profile(
     )
 
     n = len(expanded_points)
-    _n_splits = sum(1 for a in expanded_actions if a == "terrain_split")
+    _n_splits = sum(1 for a in expanded_actions if a == Action.TERRAIN_SPLIT)
     logger.info(
         "Step 2b — leg splitting: %d midpoints inserted (%d → %d waypoints)",
         n - _pre_split_count,
@@ -581,7 +582,7 @@ def plan_altitude_profile(
             )
             result_points.append(ramp_start_point)
             result_altitudes.append(incoming_alt)
-            result_actions.append("ramp_start")
+            result_actions.append(Action.RAMP_START)
         else:
             # Ramp spans the full leg (rare after Step 4; only floating-point edge cases).
             actual_slope = abs(delta) / max(leg_len, 0.1)
@@ -605,7 +606,7 @@ def plan_altitude_profile(
         result_altitudes.append(outgoing_alt)
         result_actions.append(action)
 
-    _n_ramp_segs = sum(1 for a in result_actions if a == "ramp_start")
+    _n_ramp_segs = sum(1 for a in result_actions if a == Action.RAMP_START)
     logger.info(
         "Step 7 — ramp insertion: %d ramp segments added (%d key waypoints total)",
         _n_ramp_segs,
@@ -625,7 +626,7 @@ def plan_altitude_profile(
         point_radius_m=params.point_radius_m,
     )
 
-    _n_pins = sum(1 for a in result_actions if a == "ramp_pin")
+    _n_pins = sum(1 for a in result_actions if a == Action.RAMP_PIN)
     logger.info(
         "Step 8 — ramp terrain pins: %d pin waypoints inserted (%d key waypoints total)",
         _n_pins,

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -19,18 +19,29 @@ if TYPE_CHECKING:
 
 # ── Action type ───────────────────────────────────────────────────────────────
 
-ActionType = Literal[
-    "waypoint",
-    "poi",
-    "lawnmower",
-    "warp_weft",
-    "land",
-    "zone_crossing",
-    "terrain_split",
-    "ramp_start",
-    "ramp_pin",
-]
-"""All valid action strings for a Waypoint3D."""
+
+class Action(str, Enum):
+    """All valid action labels for a dense Waypoint3D."""
+
+    WAYPOINT = "waypoint"
+    POI = "poi"
+    LAWNMOWER = "lawnmower"
+    WARP_WEFT = "warp_weft"
+    SMART_LAWNMOWER = "smart_lawnmower"
+    LAND = "land"
+    ZONE_CROSSING = "zone_crossing"
+    TERRAIN_SPLIT = "terrain_split"
+    RAMP_START = "ramp_start"
+    RAMP_PIN = "ramp_pin"
+
+
+# Waypoints that belong to a POI scan area (used for zone colouring / violations).
+POI_SCAN_ACTIONS: frozenset[Action] = frozenset(
+    {Action.POI, Action.LAWNMOWER, Action.WARP_WEFT, Action.SMART_LAWNMOWER}
+)
+
+# POI scan actions plus ramp transitions attached to POI zones.
+POI_MANEUVER_ACTIONS: frozenset[Action] = frozenset({*POI_SCAN_ACTIONS, Action.RAMP_START})
 
 
 # ── Geographic primitives ─────────────────────────────────────────────────────
@@ -63,7 +74,7 @@ class Waypoint3D:
     lat: float
     lon: float
     alt_msl: float  # metres MSL
-    action: ActionType
+    action: Action
 
 
 # ── Terrain sampling ──────────────────────────────────────────────────────────

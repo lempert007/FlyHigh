@@ -8,6 +8,7 @@
  */
 
 import { haversineM } from "./math";
+import { SegmentType } from "../types/mission";
 import type { ProfilePoint } from "../types/mission";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -102,10 +103,10 @@ export function validateAltitudes(
 
 // ── Zone shapes for Plotly ────────────────────────────────────────────────────
 
-const ZONE_COLORS: Record<string, string> = {
-  transit: "rgba(0,0,0,0)",
-  poi_scan: "rgba(255,200,50,0.12)",
-  waypoint: "rgba(120,255,120,0.10)",
+const ZONE_COLORS: Record<SegmentType, string> = {
+  [SegmentType.TRANSIT]: "rgba(0,0,0,0)",
+  [SegmentType.POI_SCAN]: "rgba(255,200,50,0.12)",
+  [SegmentType.WAYPOINT]: "rgba(120,255,120,0.10)",
 };
 
 export interface PlotlyShape {
@@ -130,10 +131,10 @@ export function buildZoneShapes(profilePoints: ProfilePoint[]): PlotlyShape[] {
 
   const shapes: PlotlyShape[] = [];
   let zoneStart = 0;
-  let currentType = profilePoints[0].segment_type;
+  let currentType: SegmentType = profilePoints[0].segment_type;
 
-  const pushShape = (startIdx: number, endIdx: number, type: string) => {
-    const color = ZONE_COLORS[type] ?? "rgba(0,0,0,0)";
+  const pushShape = (startIdx: number, endIdx: number, type: SegmentType) => {
+    const color = ZONE_COLORS[type];
     if (color === "rgba(0,0,0,0)") return; // skip transparent transit segments
     shapes.push({
       type: "rect",

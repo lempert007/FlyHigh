@@ -16,7 +16,7 @@ import config as _config
 from core.geometry import points_in_polygon_utm
 from core.types import AltitudeBand, LatLon, PoiZone
 from core.utm_utils import latlon_to_utm, utm_to_latlon_obj
-from models import POIConfig
+from models import ManeuverType, POIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -409,7 +409,7 @@ def build_poi_zone(
     # Resolve boundary polygon
     if m.polygon:
         boundary = tuple(LatLon(lat=v.lat, lon=v.lon) for v in m.polygon)
-    elif m.type in ("lawnmower", "smart_lawnmower"):
+    elif m.type in (ManeuverType.LAWNMOWER, ManeuverType.SMART_LAWNMOWER):
         # Rotate the bounding rectangle to match the lawnmower sweep direction.
         # warp_weft generates two axis-aligned passes (0° and 90°) so no rotation needed.
         boundary = _rectangle_boundary(

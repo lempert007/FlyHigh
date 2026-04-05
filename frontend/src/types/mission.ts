@@ -24,7 +24,19 @@ export const INTERACTION_RESET: InteractionState = {
   polygonVertices: [],
 };
 
-export type ManeuverType = "lawnmower" | "warp_weft" | "smart_lawnmower";
+export const ManeuverType = {
+  LAWNMOWER: "lawnmower",
+  WARP_WEFT: "warp_weft",
+  SMART_LAWNMOWER: "smart_lawnmower",
+} as const;
+export type ManeuverType = (typeof ManeuverType)[keyof typeof ManeuverType];
+
+export const SegmentType = {
+  TRANSIT: "transit",
+  POI_SCAN: "poi_scan",
+  WAYPOINT: "waypoint",
+} as const;
+export type SegmentType = (typeof SegmentType)[keyof typeof SegmentType];
 
 export interface Maneuver {
   type: ManeuverType;
@@ -133,7 +145,7 @@ export interface PlanMeta {
 
 export interface ProfilePoint {
   dist_m: number;
-  segment_type: "transit" | "poi_scan" | "waypoint";
+  segment_type: SegmentType;
   poi_id: number | null;
   waypoint_id: number | null;
 }

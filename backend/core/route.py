@@ -23,6 +23,8 @@ from core.battery import estimate_flight
 from core.safety import check_route_safety
 from core.terrain import sample_elevation as _sample_elevation
 from core.types import (
+    POI_SCAN_ACTIONS,
+    Action,
     AltitudeBand,
     LatLon,
     MissionInput,
@@ -159,7 +161,7 @@ def _smart_route_lateral(
     Note: shifted points are NOT validated against POI zones.  Only pure
     transit legs (no adjacent POI actions) are eligible for lateral shifting.
     """
-    poi_actions = {"lawnmower", "warp_weft", "poi"}
+    poi_actions = POI_SCAN_ACTIONS
     pts = list(key_waypoints)
     n = len(pts)
     blocks_analysed = 0
@@ -262,24 +264,24 @@ def plan_route(mission: MissionInput) -> MissionResult:
 
     # ── Steps 2–4: Assemble the full 2-D waypoint + action list ───────────────
     waypoints_2d: list[LatLon] = [mission.start]
-    actions: list[str] = ["waypoint"]
+    actions: list[Action] = [Action.WAYPOINT]
 
     for wp in mission.waypoints:
         waypoints_2d.append(wp)
-        actions.append("waypoint")
+        actions.append(Action.WAYPOINT)
 
     for zone, pattern in zip(ordered_zones, ordered_2d):
         # Use the first pattern point as POI entry; rest as maneuver waypoints
         if pattern:
             waypoints_2d.append(pattern[0])
-            actions.append("poi")
+            actions.append(Action.POI)
             for pt in pattern[1:]:
                 waypoints_2d.append(pt)
                 # Determine action from zone type
                 if "warp" in zone.zone_id.lower() or "weft" in zone.zone_id.lower():
-                    actions.append("warp_weft")
+                    actions.append(Action.WARP_WEFT)
                 else:
-                    actions.append("lawnmower")
+                    actions.append(Action.LAWNMOWER)
         else:
             # No pattern generated — use zone centroid
             if not zone.boundary_latlon:
@@ -288,10 +290,10 @@ def plan_route(mission: MissionInput) -> MissionResult:
             centroid_lat = sum(v.lat for v in zone.boundary_latlon) / len(zone.boundary_latlon)
             centroid_lon = sum(v.lon for v in zone.boundary_latlon) / len(zone.boundary_latlon)
             waypoints_2d.append(LatLon(lat=centroid_lat, lon=centroid_lon))
-            actions.append("poi")
+            actions.append(Action.POI)
 
     waypoints_2d.append(mission.landing)
-    actions.append("land")
+    actions.append(Action.LAND)
 
     logger.info(
         "2-D path: %d waypoints (%d POI zones), start=%s, landing=%s",

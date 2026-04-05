@@ -34,6 +34,7 @@ import KeyboardDoubleArrowDownIcon from "@mui/icons-material/KeyboardDoubleArrow
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 
+import { SegmentType } from "../../types/mission";
 import type { ProfilePoint, Violation } from "../../types/mission";
 import type { WpPoint, ValidationStatus } from "../../utils/altitudeEditorUtils";
 import { formatDist } from "../../utils/math";
@@ -65,16 +66,16 @@ interface InspectorPanelProps {
   onClose: () => void;
 }
 
-const SEGMENT_LABELS: Record<string, string> = {
-  transit: "Transit",
-  poi_scan: "POI Scan",
-  waypoint: "Waypoint",
+const SEGMENT_LABELS: Record<SegmentType, string> = {
+  [SegmentType.TRANSIT]: "Transit",
+  [SegmentType.POI_SCAN]: "POI Scan",
+  [SegmentType.WAYPOINT]: "Waypoint",
 };
 
-const SEGMENT_COLORS: Record<string, string> = {
-  transit: "#484f58",
-  poi_scan: "#b8860b",
-  waypoint: "#388bfd",
+const SEGMENT_COLORS: Record<SegmentType, string> = {
+  [SegmentType.TRANSIT]: "#484f58",
+  [SegmentType.POI_SCAN]: "#b8860b",
+  [SegmentType.WAYPOINT]: "#388bfd",
 };
 
 function NudgeRow({
@@ -291,10 +292,10 @@ export default function InspectorPanel({
             {/* Segment badge + status */}
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <Chip
-                label={SEGMENT_LABELS[selectedPp.segment_type] ?? selectedPp.segment_type}
+                label={SEGMENT_LABELS[selectedPp.segment_type]}
                 size="small"
                 sx={{
-                  bgcolor: SEGMENT_COLORS[selectedPp.segment_type] ?? "#484f58",
+                  bgcolor: SEGMENT_COLORS[selectedPp.segment_type],
                   color: "#fff",
                   fontSize: "0.7rem",
                   height: 22,

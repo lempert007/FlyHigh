@@ -12,6 +12,21 @@ from pydantic import BaseModel, Field, model_validator
 
 import config
 
+# ── Shared enums ─────────────────────────────────────────────────────────────
+
+
+class ManeuverType(str, Enum):
+    LAWNMOWER = "lawnmower"
+    WARP_WEFT = "warp_weft"
+    SMART_LAWNMOWER = "smart_lawnmower"
+
+
+class SegmentType(str, Enum):
+    TRANSIT = "transit"
+    POI_SCAN = "poi_scan"
+    WAYPOINT = "waypoint"
+
+
 # ── Shared coordinate type ────────────────────────────────────────────────────
 
 
@@ -24,7 +39,7 @@ class PointLatLon(BaseModel):
 
 
 class ManeuverConfig(BaseModel):
-    type: Literal["lawnmower", "warp_weft", "smart_lawnmower"] = "lawnmower"
+    type: ManeuverType = ManeuverType.LAWNMOWER
 
     # lawnmower / warp_weft params
     width_m: float = Field(
@@ -421,7 +436,7 @@ class AppSettings(BaseModel):
 
 class ProfilePoint(BaseModel):
     dist_m: float
-    segment_type: str  # "transit" | "poi_scan" | "waypoint"
+    segment_type: SegmentType
     poi_id: int | None = None  # 0-based index into req.pois if in a POI zone
     waypoint_id: int | None = None  # 0-based index into req.waypoints if at a waypoint
 

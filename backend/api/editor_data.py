@@ -11,10 +11,10 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 import session as session_store
+from core.types import POI_SCAN_ACTIONS, Action
+from models import SegmentType
 
 router = APIRouter(prefix="/plan", tags=["editor-data"])
-
-_POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower", "ramp_start"})
 
 
 def _build_profile_points(
@@ -32,7 +32,7 @@ def _build_profile_points(
         action = wp.get("action", "")
         dist_m = round(float(cum_dists[i]), 2) if i < len(cum_dists) else 0.0
 
-        if action in _POI_ACTIONS:
+        if action in POI_SCAN_ACTIONS:
             # Find the last POI block that started at or before this index
             poi_id: int | None = None
             for j, start in enumerate(poi_starts):
@@ -41,24 +41,29 @@ def _build_profile_points(
             result.append(
                 {
                     "dist_m": dist_m,
-                    "segment_type": "poi_scan",
+                    "segment_type": SegmentType.POI_SCAN,
                     "poi_id": poi_id,
                     "waypoint_id": None,
                 }
             )
-        elif action == "waypoint":
+        elif action == Action.WAYPOINT:
             waypoint_id = wp_index_map.get(i)
             result.append(
                 {
                     "dist_m": dist_m,
-                    "segment_type": "waypoint",
+                    "segment_type": SegmentType.WAYPOINT,
                     "poi_id": None,
                     "waypoint_id": waypoint_id,
                 }
             )
         else:
             result.append(
-                {"dist_m": dist_m, "segment_type": "transit", "poi_id": None, "waypoint_id": None}
+                {
+                    "dist_m": dist_m,
+                    "segment_type": SegmentType.TRANSIT,
+                    "poi_id": None,
+                    "waypoint_id": None,
+                }
             )
 
     return result

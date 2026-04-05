@@ -49,6 +49,9 @@ from core.route import (
 from core.safety import compute_profile_bands
 from core.terrain import TerrainIndex, build_terrain_index
 from core.types import (
+    POI_MANEUVER_ACTIONS,
+    POI_SCAN_ACTIONS,
+    Action,
     AltitudeBand,
     FlightParams,
     LatLon,
@@ -68,13 +71,9 @@ from export.render_map import render_map_html
 from export.render_profile import render_profile_html
 from export.render_smart_route_diff import render_smart_route_diff_html
 from export.waypoints import serialise_waypoints_json, to_waypoints_json
-from models import FlightConfig, PlanMeta, POIConfig, RouteRequest, ViolationInfo
+from models import FlightConfig, ManeuverType, PlanMeta, POIConfig, RouteRequest, ViolationInfo
 
 logger = logging.getLogger(__name__)
-
-# Actions that indicate a dense waypoint is inside a POI scan area
-_POI_ACTIONS = frozenset({"poi", "lawnmower", "warp_weft", "smart_lawnmower"})
-_POI_MANEUVER_ACTIONS = {"poi", "lawnmower", "warp_weft", "smart_lawnmower", "ramp_start"}
 
 
 # ── Stage dataclasses ─────────────────────────────────────────────────────────
@@ -313,7 +312,7 @@ def run_route_stage(
     cum_dists = compute_cumulative_distances(dense_utm)
     total_dist_m = float(cum_dists[-1]) if len(cum_dists) > 0 else 0.0
     landing_index = next(
-        (i for i in range(n_dense - 1, -1, -1) if dense_actions[i] == "land"),
+        (i for i in range(n_dense - 1, -1, -1) if dense_actions[i] == Action.LAND),
         n_dense - 1,
     )
 
@@ -373,14 +372,14 @@ def run_analysis_stage(
         for v, pidx in zip(route.result.violations, point_indices):
             if v.tier == ViolationTier.HARD:
                 category = "safety"
-            elif dense_actions[pidx] in _POI_ACTIONS:
+            elif dense_actions[pidx] in POI_SCAN_ACTIONS:
                 category = "product_poi"
             else:
                 category = "product_route"
             violations_info.append(_violation_to_info(v, int(pidx), category))
 
     # POI scan quality
-    poi_mask = np.array([a in _POI_ACTIONS for a in dense_actions])
+    poi_mask = np.array([a in POI_SCAN_ACTIONS for a in dense_actions])
     poi_total = int(poi_mask.sum())
     if poi_total > 0:
         poi_violated_indices = {
@@ -804,7 +803,7 @@ def _expand_maneuver_latlon(
 ) -> list[LatLon]:
     m = poi.maneuver
     center = LatLon(lat=poi.point.lat, lon=poi.point.lon)
-    if m.type == "lawnmower":
+    if m.type == ManeuverType.LAWNMOWER:
         if m.polygon:
             return generate_lawnmower_polygon_pattern(
                 m.polygon, m.sweep_spacing_m, zone_str, prefer_start=prev_point
@@ -812,7 +811,7 @@ def _expand_maneuver_latlon(
         return generate_lawnmower_pattern(
             center, m.width_m, m.height_m, m.sweep_spacing_m, entry_bearing
         )
-    if m.type == "warp_weft":
+    if m.type == ManeuverType.WARP_WEFT:
         if m.polygon:
             wps_a = generate_lawnmower_polygon_pattern(
                 m.polygon, m.sweep_spacing_m, zone_str, prefer_start=prev_point
@@ -822,7 +821,7 @@ def _expand_maneuver_latlon(
             )
             return wps_a + wps_b
         return generate_warp_and_weft_pattern(center, m.width_m, m.height_m, m.sweep_spacing_m)
-    if m.type == "smart_lawnmower":
+    if m.type == ManeuverType.SMART_LAWNMOWER:
         h = m.poi_max_agl_m if m.poi_max_agl_m is not None else params.max_agl_m
         if m.polygon:
             return generate_smart_lawnmower_polygon_pattern(
@@ -838,7 +837,7 @@ def _find_waypoint_block_starts(dense_actions: list[str]) -> list[int]:
     result = []
     prev = None
     for i, action in enumerate(dense_actions):
-        if action == "waypoint" and prev != "waypoint":
+        if action == Action.WAYPOINT and prev != Action.WAYPOINT:
             result.append(i)
         prev = action
     return result
@@ -846,11 +845,12 @@ def _find_waypoint_block_starts(dense_actions: list[str]) -> list[int]:
 
 def _find_poi_block_starts(dense_actions: list[str]) -> list[int]:
     result = []
-    prev = None
+    prev_in_poi = False
     for i, action in enumerate(dense_actions):
-        if action == "poi" and prev != "poi":
+        in_poi = action in POI_SCAN_ACTIONS
+        if in_poi and not prev_in_poi:
             result.append(i)
-        prev = action
+        prev_in_poi = in_poi
     return result
 
 
@@ -862,7 +862,7 @@ def _find_poi_end_indices(
     result = []
     for start_i in poi_start_indices:
         end_i = start_i
-        while end_i < n_dense - 1 and dense_actions[end_i] in _POI_MANEUVER_ACTIONS:
+        while end_i < n_dense - 1 and dense_actions[end_i] in POI_MANEUVER_ACTIONS:
             end_i += 1
         result.append(end_i)
     return result

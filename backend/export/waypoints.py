@@ -8,6 +8,7 @@ import json
 
 import numpy as np
 
+from core.types import Action
 from core.utm_utils import utm_to_latlon
 from models import WaypointOut
 
@@ -35,9 +36,9 @@ def to_waypoints_json(
     """
     n = len(utm_points)
     if actions is None:
-        actions = ["waypoint"] * n
+        actions = [Action.WAYPOINT] * n
     elif len(actions) < n:
-        actions = list(actions) + ["waypoint"] * (n - len(actions))
+        actions = list(actions) + [Action.WAYPOINT] * (n - len(actions))
 
     waypoints: list[dict] = []
     for i in range(n):
