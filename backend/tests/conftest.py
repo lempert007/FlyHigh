@@ -219,7 +219,10 @@ def make_request(
 async def plan(client, request: dict) -> tuple[dict, list[dict]]:
     """
     POST /plan — returns application/zip with X-Plan-Meta header.
-    Returns (meta_dict, waypoints_list).
+
+    Returns (meta_dict, waypoints_list) where meta_dict is the full PlanMeta
+    including violations (merged from the ZIP's meta.json, since violations are
+    excluded from the HTTP header to avoid header size limits).
     """
     resp = await client.post("/plan", json=request)
     assert resp.status_code == 200, f"Plan failed (status {resp.status_code}): {resp.text[:500]}"
@@ -230,5 +233,10 @@ async def plan(client, request: dict) -> tuple[dict, list[dict]]:
 
     zf = zipfile.ZipFile(io.BytesIO(resp.content))
     waypoints = json.loads(zf.read("waypoints.json"))
+
+    # Violations are stripped from the header (size limit); read them from the ZIP.
+    if "meta.json" in zf.namelist():
+        full_meta = json.loads(zf.read("meta.json"))
+        meta.setdefault("violations", full_meta.get("violations", []))
 
     return meta, waypoints

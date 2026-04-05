@@ -844,13 +844,18 @@ def _find_waypoint_block_starts(dense_actions: list[str]) -> list[int]:
 
 
 def _find_poi_block_starts(dense_actions: list[str]) -> list[int]:
+    """Return indices where a new POI zone starts (action transitions to Action.POI).
+
+    Action.POI is the explicit entry marker for the first waypoint of each POI zone;
+    using it (not POI_SCAN_ACTIONS) avoids false triggers from ramp_start interruptions
+    within a zone.
+    """
     result = []
-    prev_in_poi = False
+    prev = None
     for i, action in enumerate(dense_actions):
-        in_poi = action in POI_SCAN_ACTIONS
-        if in_poi and not prev_in_poi:
+        if action == Action.POI and prev != Action.POI:
             result.append(i)
-        prev_in_poi = in_poi
+        prev = action
     return result
 
 

@@ -30,7 +30,7 @@ from core.missions import (
     save_mission,
     save_plan,
 )
-from core.types import POI_SCAN_ACTIONS
+from core.types import Action
 from export.packager import strip_internal_files
 from models import (
     AltEditBody,
@@ -155,14 +155,14 @@ async def get_mission_editor_data(folder: str) -> dict:
                 else None
             )
 
-        # Derive POI block starts from action strings
+        # Derive POI block starts: only the explicit "poi" entry marker fires once per zone.
         poi_indices: list[int] = []
-        prev_in_poi = False
+        prev_action = None
         for i, wp in enumerate(wps):
-            in_poi = wp.get("action", "") in POI_SCAN_ACTIONS
-            if in_poi and not prev_in_poi:
+            action = wp.get("action", "")
+            if action == Action.POI and prev_action != Action.POI:
                 poi_indices.append(i)
-            prev_in_poi = in_poi
+            prev_action = action
 
         # Build cumulative distances for profile points
         _R = 6_371_000
