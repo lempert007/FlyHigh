@@ -82,7 +82,6 @@ def _run_planning_sync(req: RouteRequest) -> tuple[bytes, PlanMeta]:
                 terrain_elevs=route.terrain_elevs,
                 agl_arr=route.agl_arr,
                 cum_dists=route.cum_dists,
-                cum_energy=render.cum_energy,
                 start_index=0,
                 landing_index=route.landing_index,
                 poi_indices=render.poi_indices or [],

@@ -149,8 +149,6 @@ class FlightParams:
     cruise_speed_ms: float
     climb_rate_ms: float
     spacing_m: float  # route densification spacing
-    battery_wh: float
-    drone_weight_kg: float
     point_radius_m: float
     max_surface_radius_m: float  # 0 = disabled; >0 = HARD camera-range check
     takeoff_alt_msl: float | None  # None → auto-derive from terrain + min_agl
@@ -196,8 +194,6 @@ class MissionResult:
     violations: list[Violation]
     total_distance_m: float
     flight_time_s: float
-    energy_wh: float
-    budget_pct: float
     terrain_resolution_m: float | None
     covered_area_m2: float | None
     smart_route_summary: str | None

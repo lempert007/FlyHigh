@@ -44,7 +44,6 @@ class LastPlanData:
     terrain_elevs: np.ndarray
     agl_arr: np.ndarray
     cum_dists: np.ndarray
-    cum_energy: np.ndarray
     start_index: int
     landing_index: int
     poi_indices: list[int]

@@ -31,33 +31,6 @@ from climb_rate_ms / cruise_speed_ms. Set e.g. 0.3 to cap at 1:3.3 regardless of
 DEFAULT_SPACING_M: float = 5.0
 """Distance between adjacent computed route points in metres — controls output resolution."""
 
-# ── Battery / weight ──────────────────────────────────────────────────────────
-DEFAULT_BATTERY_WH: float = 200.0
-"""Total usable battery energy in Watt-hours."""
-
-DEFAULT_DRONE_WEIGHT_KG: float = 1.5
-"""All-up drone mass in kilograms — used in the power model."""
-
-
-# ── Physics ───────────────────────────────────────────────────────────────────
-GRAVITY_MS2: float = 9.81
-"""Standard gravitational acceleration in m/s²."""
-
-AIR_DENSITY_KGM3: float = 1.225
-"""International Standard Atmosphere sea-level air density in kg/m³."""
-
-HOVER_POWER_SCALE_W: float = 75.0
-"""Scale factor for hover power: P_hover = HOVER_POWER_SCALE_W * weight_kg^1.5.
-Units: W / kg^1.5. Calibrated from small–medium camera drones (0.9–5 kg).
-DJI Mavic class (~0.9 kg): ~64 W hover; 3 kg survey drone: ~390 W hover."""
-
-PROFILE_POWER_FRACTION: float = 0.10
-"""Blade profile drag as a fraction of hover power (typically 8–12%)."""
-
-PARASITE_DRAG_COEFF: float = 0.022
-"""Effective body drag area Cd×A in m². Used as 0.5*rho*Cd*A*v^3 for parasite power.
-Calibrated for a typical 1–3 kg drone frontal silhouette."""
-
 # ── Terrain interpolation ─────────────────────────────────────────────────────
 NODATA_FILL: float = float("nan")
 """Value used to fill masked / nodata cells in raster arrays before interpolation."""
@@ -136,19 +109,12 @@ Rings are spaced evenly from radius/K to radius. A center-point sample is
 always added, giving BUBBLE_RING_COUNT * BUBBLE_SAMPLE_COUNT + 1 terrain
 queries per route point."""
 
-# ── Warnings / errors ────────────────────────────────────────────────────────
-BATTERY_WARNING_PCT: float = 90.0
-"""Budget percentage above which an amber warning is surfaced."""
-
 # ── AGL profile chart thresholds ──────────────────────────────────────────────
 AGL_PROFILE_GOOD_M: float = 15.0
 """AGL clearance above which the profile chart colours a point green."""
 
 AGL_PROFILE_WARN_M: float = 5.0
 """AGL clearance below which the profile chart colours a point red (amber between warn and good)."""
-
-BATTERY_ERROR_PCT: float = 100.0
-"""Budget percentage above which a red error is surfaced (route still returned)."""
 
 # ── Session management ────────────────────────────────────────────────────────
 SESSION_PRUNE_INTERVAL_S: int = 300
@@ -200,15 +166,6 @@ SPLIT_MIN_LEG_M: float = 5.0
 Prevents degenerate sub-metre waypoints on cliff-edge or quarry-wall terrain
 where terrain variation can never be satisfied regardless of how small the leg is."""
 
-# ── RTH battery reserve ────────────────────────────────────────────────────────
-RTH_ENERGY_MARGIN: float = 1.15
-"""Safety multiplier applied to the estimated emergency RTH energy.
-A 15% buffer accounts for headwind and battery degradation on the return leg."""
-
-RTH_WARNING_THRESHOLD_PCT: float = 20.0
-"""Warn if the emergency RTH reserve alone exceeds this percentage of total battery.
-Above 20% the mission leaves limited abort margin — operator should consider range."""
-
 
 def _validate() -> None:
     """Assert invariants on constants at import time to catch misconfiguration early."""
@@ -220,11 +177,6 @@ def _validate() -> None:
     assert DEFAULT_SPACING_M > 0, "DEFAULT_SPACING_M must be positive"
     assert DEFAULT_CRUISE_SPEED_MS > 0, "DEFAULT_CRUISE_SPEED_MS must be positive"
     assert DEFAULT_CLIMB_RATE_MS > 0, "DEFAULT_CLIMB_RATE_MS must be positive"
-    assert DEFAULT_BATTERY_WH > 0, "DEFAULT_BATTERY_WH must be positive"
-    assert DEFAULT_DRONE_WEIGHT_KG > 0, "DEFAULT_DRONE_WEIGHT_KG must be positive"
-    assert HOVER_POWER_SCALE_W > 0, "HOVER_POWER_SCALE_W must be positive"
-    assert 0 < PROFILE_POWER_FRACTION < 1, "PROFILE_POWER_FRACTION must be in (0, 1)"
-    assert PARASITE_DRAG_COEFF > 0, "PARASITE_DRAG_COEFF must be positive"
     assert SMART_ROUTE_CORRIDOR_M > 0, "SMART_ROUTE_CORRIDOR_M must be positive"
     assert SESSION_TTL_SECONDS > 0, "SESSION_TTL_SECONDS must be positive"
 

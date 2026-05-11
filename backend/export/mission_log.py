@@ -85,8 +85,6 @@ def generate_mission_log(
     secs = int(meta.flight_time_s % 60)
     lines.append(f"  Total distance : {dist_km:.2f} km ({meta.total_distance_m:.0f} m)")
     lines.append(f"  Flight time    : {mins} min {secs} s")
-    lines.append(f"  Energy used    : {meta.energy_wh:.1f} Wh")
-    lines.append(f"  Battery budget : {meta.budget_pct:.1f} %")
 
     if final_alts is not None and len(final_alts) > 0:
         lines.append(f"  Altitude range : {final_alts.min():.1f} – {final_alts.max():.1f} m MSL")
@@ -104,8 +102,6 @@ def generate_mission_log(
     lines.append(f"  Cruise speed   : {flight_cfg.cruise_speed_ms} m/s")
     lines.append(f"  Climb rate     : {flight_cfg.climb_rate_ms} m/s")
     lines.append(f"  Route spacing  : {flight_cfg.spacing_m} m")
-    lines.append(f"  Battery        : {flight_cfg.battery_wh} Wh")
-    lines.append(f"  Drone weight   : {flight_cfg.drone_weight_kg} kg")
     lines.append(f"  Smart Route    : {'enabled' if flight_cfg.smart_route else 'disabled'}")
 
     # ── Status ────────────────────────────────────────────────────────────────

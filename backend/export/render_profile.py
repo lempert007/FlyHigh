@@ -7,7 +7,6 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
-import config
 from export.html_utils import inject_dark_fullscreen_css
 from models import FlightConfig
 
@@ -22,7 +21,6 @@ def render_profile_html(
     return_home_distance: float | None = None,
     poi_band_overrides: list[tuple[float, float, float, float]] | None = None,
     poi_scan_areas: list[tuple[float, float]] | None = None,
-    cumulative_energy_wh: np.ndarray | None = None,
     violation_points: list[tuple[int, str]] | None = None,
     bubble_peak_terrain: np.ndarray | None = None,
     camera_min_terrain: np.ndarray | None = None,
@@ -34,9 +32,6 @@ def render_profile_html(
             AGL band overrides applied on top of the global band.
         return_home_distance: cumulative distance (metres) at which the drone
             starts the return-to-home leg (i.e. the landing keypoint distance).
-        cumulative_energy_wh: per-point cumulative energy in Wh; used to place
-            the battery warning marker at the correct distance rather than a
-            naive distance-fraction estimate.
         bubble_peak_terrain: peak terrain elevation within the safety bubble disc
             at each route point. When provided, used as the floor reference for
             the min AGL band instead of the terrain directly below the drone.
@@ -204,23 +199,6 @@ def render_profile_html(
             annotation_text="RTH",
             annotation_position="top left",
         )
-
-    # Battery warning threshold — mark where cumulative energy hits the warning %
-    if (
-        cumulative_energy_wh is not None
-        and len(cumulative_energy_wh) == len(dist)
-        and flight_cfg.battery_wh > 0
-    ):
-        warn_energy = flight_cfg.battery_wh * config.BATTERY_WARNING_PCT / 100.0
-        indices_over = np.where(cumulative_energy_wh >= warn_energy)[0]
-        if len(indices_over) > 0:
-            warn_x = float(dist[indices_over[0]])
-            fig.add_vline(
-                x=warn_x,
-                line=dict(color="orange", width=1, dash="dot"),
-                annotation_text=f"{config.BATTERY_WARNING_PCT:.0f}% battery",
-                annotation_position="bottom right",
-            )
 
     # Violation scatter markers — one trace per category
     if violation_points:

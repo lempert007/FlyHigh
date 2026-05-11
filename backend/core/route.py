@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 
 from config import SMART_ROUTE_LATERAL_SAMPLES
 from core.altitude import plan_altitude_profile
-from core.battery import estimate_flight
 from core.safety import check_route_safety
 from core.terrain import sample_elevation as _sample_elevation
 from core.types import (
@@ -354,17 +353,16 @@ def plan_route(mission: MissionInput) -> MissionResult:
     )
     all_violations = altitude_violations + safety_violations
 
-    # ── Step 10: Energy and flight time ───────────────────────────────────────
+    # ── Step 10: Flight time ──────────────────────────────────────────────────
     dense_alts = np.array([w.alt_msl for w in dense_wps])
-    flight = estimate_flight(dense_utm, dense_alts, params)
     total_dist_m = float(compute_cumulative_distances(dense_utm)[-1]) if len(dense_utm) > 1 else 0.0
+    climb_dist = float(np.sum(np.maximum(0.0, np.diff(dense_alts))))
+    flight_time_s = total_dist_m / params.cruise_speed_ms + climb_dist / params.climb_rate_ms
 
     logger.info(
-        "Route complete: %.0f m, %.0f s, %.1f Wh (%.0f%% battery)",
+        "Route complete: %.0f m, %.0f s",
         total_dist_m,
-        flight.flight_time_s,
-        flight.energy_wh,
-        flight.budget_pct,
+        flight_time_s,
     )
 
     return MissionResult(
@@ -372,9 +370,7 @@ def plan_route(mission: MissionInput) -> MissionResult:
         dense_utm=dense_utm,
         violations=all_violations,
         total_distance_m=round(total_dist_m, 1),
-        flight_time_s=round(flight.flight_time_s, 1),
-        energy_wh=round(flight.energy_wh, 2),
-        budget_pct=round(flight.budget_pct, 1),
+        flight_time_s=round(flight_time_s, 1),
         terrain_resolution_m=getattr(dsm, "resolution_m", None),
         covered_area_m2=None,  # computed in plan.py from maneuver parameters
         smart_route_summary=smart_route_summary,

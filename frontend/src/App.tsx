@@ -196,8 +196,6 @@ export default function App() {
       const config: DronePreset["config"] = {
         cruise_speed_ms: p.cruise_speed_ms,
         climb_rate_ms: p.climb_rate_ms,
-        battery_wh: p.battery_wh,
-        drone_weight_kg: p.drone_weight_kg,
       };
       if (p.min_agl_m != null) config.min_agl_m = p.min_agl_m;
       if (p.max_agl_m != null) config.max_agl_m = p.max_agl_m;
@@ -215,8 +213,6 @@ export default function App() {
       const matches =
         p.cruise_speed_ms === flightConfig.cruise_speed_ms &&
         p.climb_rate_ms === flightConfig.climb_rate_ms &&
-        p.battery_wh === flightConfig.battery_wh &&
-        p.drone_weight_kg === flightConfig.drone_weight_kg &&
         (p.min_agl_m == null || p.min_agl_m === flightConfig.min_agl_m) &&
         (p.max_agl_m == null || p.max_agl_m === flightConfig.max_agl_m) &&
         (p.point_radius_m == null || p.point_radius_m === flightConfig.point_radius_m) &&
@@ -565,8 +561,6 @@ export default function App() {
             setPlanMeta(meta);
             showSnack("Altitude edits applied — results updated.", "success");
           }}
-          batteryWarningPct={appSettings?.battery_warning_pct}
-          batteryErrorPct={appSettings?.battery_error_pct}
           violationFilters={violationFilters}
           onToggleViolationCategory={handleToggleViolationCategory}
         />

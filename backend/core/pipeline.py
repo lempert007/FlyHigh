@@ -30,7 +30,6 @@ import utm as _utm_lib
 from scipy.spatial import KDTree
 
 import config
-from core.battery import estimate_flight
 from core.poi import (
     build_poi_zone,
     compute_entry_bearing,
@@ -122,10 +121,7 @@ class RouteStage:
 class AnalysisStage:
     violations_info: list[ViolationInfo]
     poi_scan_good_pct: float | None
-    energy_wh: float
     flight_time_s: float
-    budget_pct: float
-    rth_reserve_pct: float | None
     warning: str | None
     error: str | None
 
@@ -145,7 +141,6 @@ class RenderStage:
     waypoint_indices: list[int]
     poi_indices: list[int]
     poi_end_indices: list[int]
-    cum_energy: np.ndarray
     bubble_peak_terrain: np.ndarray
     camera_min_terrain: np.ndarray
     poi_bands_json_str: str | None
@@ -338,15 +333,10 @@ def run_route_stage(
 
 def run_analysis_stage(
     route: RouteStage,
-    geometry: GeometryStage,
     terrain: TerrainStage,
-    params: FlightParams,
-    fc: FlightConfig,
-    app_settings,
 ) -> AnalysisStage:
-    """Map violations, compute quality metrics, energy, and RTH reserve."""
+    """Map violations, compute quality metrics."""
     dense_utm = route.dense_utm
-    final_alts = route.final_alts
     dense_actions = route.dense_actions
     n_dense = route.n_dense
 
@@ -391,46 +381,15 @@ def run_analysis_stage(
     else:
         poi_scan_good_pct = None
 
-    energy_wh = route.result.energy_wh
-    flight_time_s = route.result.flight_time_s
-    budget_pct = route.result.budget_pct
-
-    # RTH reserve
-    rth_reserve_pct: float | None = None
-    if n_dense > 1 and params.battery_wh > 0:
-        home_e, home_n = dense_utm[route.landing_index]
-        dists_from_home = np.hypot(
-            dense_utm[:, 0] - home_e,
-            dense_utm[:, 1] - home_n,
-        )
-        furthest_idx = int(np.argmax(dists_from_home))
-        rth_utm = np.array([dense_utm[furthest_idx], dense_utm[route.landing_index]])
-        rth_alts = np.array([final_alts[furthest_idx], final_alts[route.landing_index]])
-        rth_energy_wh = (
-            estimate_flight(rth_utm, rth_alts, params).energy_wh * config.RTH_ENERGY_MARGIN
-        )
-        rth_reserve_pct = round(100.0 * rth_energy_wh / params.battery_wh, 1)
-
     warning: str | None = None
     error: str | None = None
-    if budget_pct > app_settings.battery_error_pct:
-        error = f"Battery usage {budget_pct:.0f}% exceeds capacity - route returned but may not complete."
-    elif budget_pct > app_settings.battery_warning_pct:
-        warning = f"Battery usage {budget_pct:.0f}% is near capacity."
-    if rth_reserve_pct is not None and rth_reserve_pct > config.RTH_WARNING_THRESHOLD_PCT:
-        rth_warn = f"Emergency RTH reserve is {rth_reserve_pct:.0f}% of battery — plan leaves limited abort margin."
-        warning = f"{warning} {rth_warn}".strip() if warning else rth_warn
     if terrain.terrain_resolution_m is not None and terrain.terrain_resolution_m > 20.0:
-        res_warn = f"Terrain resolution is coarse ({terrain.terrain_resolution_m:.0f} m/px) - altitude clearances may be less accurate."
-        warning = f"{res_warn} {warning}" if warning else res_warn
+        warning = f"Terrain resolution is coarse ({terrain.terrain_resolution_m:.0f} m/px) - altitude clearances may be less accurate."
 
     return AnalysisStage(
         violations_info=violations_info,
         poi_scan_good_pct=poi_scan_good_pct,
-        energy_wh=energy_wh,
-        flight_time_s=flight_time_s,
-        budget_pct=budget_pct,
-        rth_reserve_pct=rth_reserve_pct,
+        flight_time_s=route.result.flight_time_s,
         warning=warning,
         error=error,
     )
@@ -515,8 +474,6 @@ def run_render_stage(
         else route.total_dist_m
     )
 
-    cum_energy = estimate_flight(dense_utm, final_alts, params).cumulative_wh
-
     bubble_peak_terrain, camera_min_terrain = compute_profile_bands(
         dense_utm, route.terrain_elevs, terrain.bubble_terrain, terrain.camera_terrain, params
     )
@@ -536,7 +493,6 @@ def run_render_stage(
         return_home_distance=return_home_dist,
         poi_band_overrides=poi_band_overrides or None,
         poi_scan_areas=poi_scan_areas or None,
-        cumulative_energy_wh=cum_energy,
         violation_points=[(v.point_index, v.category) for v in violations_info] or None,
         bubble_peak_terrain=bubble_peak_terrain,
         camera_min_terrain=camera_min_terrain,
@@ -577,11 +533,9 @@ def run_render_stage(
     )
 
     logger.info(
-        "Route complete: %.0f m, %.0f s, %.1f Wh (%.0f%% battery)",
+        "Route complete: %.0f m, %.0f s",
         route.total_dist_m,
         analysis.flight_time_s,
-        analysis.energy_wh,
-        analysis.budget_pct,
     )
 
     logger.info("Assembling ZIP archive")
@@ -659,7 +613,6 @@ def run_render_stage(
         waypoint_indices=waypoint_indices,
         poi_indices=poi_indices,
         poi_end_indices=poi_end_indices,
-        cum_energy=cum_energy,
         bubble_peak_terrain=bubble_peak_terrain,
         camera_min_terrain=camera_min_terrain,
         poi_bands_json_str=poi_bands_json_str,
@@ -694,8 +647,6 @@ def run_pipeline(
     """
     from fastapi import HTTPException
 
-    from api.settings import load_settings
-
     fc = req.config
     params = FlightParams(
         min_agl_m=fc.min_agl_m,
@@ -703,8 +654,6 @@ def run_pipeline(
         cruise_speed_ms=fc.cruise_speed_ms,
         climb_rate_ms=fc.climb_rate_ms,
         spacing_m=fc.spacing_m,
-        battery_wh=fc.battery_wh,
-        drone_weight_kg=fc.drone_weight_kg,
         point_radius_m=fc.point_radius_m,
         max_surface_radius_m=fc.max_surface_radius_m,
         takeoff_alt_msl=req.takeoff_alt_m,
@@ -727,14 +676,11 @@ def run_pipeline(
     terrain = run_terrain_stage(dsm_ds, dtm_ds, file_infos, datasets, fc)
     geometry = run_geometry_stage(req, terrain, params, global_band)
     route = run_route_stage(req, terrain, geometry, params, fc)
-    app_settings = load_settings()
-    analysis = run_analysis_stage(route, geometry, terrain, params, fc, app_settings)
+    analysis = run_analysis_stage(route, terrain)
 
     meta = PlanMeta(
         total_distance_m=round(route.total_dist_m, 1),
         flight_time_s=round(analysis.flight_time_s, 1),
-        energy_wh=round(analysis.energy_wh, 2),
-        budget_pct=round(analysis.budget_pct, 1),
         violations=analysis.violations_info,
         warning=analysis.warning,
         error=analysis.error,
@@ -749,7 +695,6 @@ def run_pipeline(
         min_agl_m=fc.min_agl_m,
         max_agl_m=fc.max_agl_m,
         poi_scan_good_pct=analysis.poi_scan_good_pct,
-        rth_reserve_pct=analysis.rth_reserve_pct,
     )
 
     render = run_render_stage(req, terrain, route, analysis, geometry, params, fc, meta)

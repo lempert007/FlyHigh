@@ -63,25 +63,3 @@ export function relativeDate(iso: string): string {
   if (d < 30) return `${d}d ago`;
   return new Date(iso).toLocaleDateString();
 }
-
-/** Map a battery percentage to a status color string. */
-export function getBatteryColor(
-  pct: number | null | undefined,
-  warnPct = 90,
-  errorPct = 100
-): string {
-  if (pct == null) return "text.secondary";
-  if (pct > errorPct) return "#ff5252";
-  if (pct > warnPct) return "#ff9100";
-  return "#00e676";
-}
-
-/** Rough client-side power estimate (W) for energy preview. */
-export function estimatePowerW(speedMs: number, weightKg: number): number {
-  const GRAVITY = 9.81;
-  const AIR_DENSITY = 1.225;
-  const HOVER_EFF = 0.7;
-  const hoverPower = Math.sqrt((weightKg * GRAVITY) ** 3 / (2 * AIR_DENSITY * 0.09)) / HOVER_EFF;
-  const forwardFactor = 1 + (speedMs / 15) ** 2 * 0.3;
-  return hoverPower * forwardFactor;
-}

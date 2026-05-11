@@ -88,20 +88,6 @@ const NUM_FIELDS: NumField[] = [
     min: 1,
     help: "Distance between computed route points",
   },
-  {
-    key: "battery_wh",
-    label: "Battery capacity",
-    unit: "Wh",
-    min: 1,
-    help: "Total available energy",
-  },
-  {
-    key: "drone_weight_kg",
-    label: "Drone weight",
-    unit: "kg",
-    min: 0.01,
-    help: "Used for energy estimation",
-  },
 ];
 
 interface FlightConfigPanelProps {

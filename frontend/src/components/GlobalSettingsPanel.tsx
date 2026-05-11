@@ -50,8 +50,6 @@ function validateRows(rows: PresetRow[]): string | null {
     if (!r.name.trim()) return "All preset names must be non-empty.";
     if (r.cruise_speed_ms <= 0) return `"${r.name}": cruise speed must be > 0.`;
     if (r.climb_rate_ms <= 0) return `"${r.name}": climb rate must be > 0.`;
-    if (r.battery_wh <= 0) return `"${r.name}": battery capacity must be > 0.`;
-    if (r.drone_weight_kg <= 0) return `"${r.name}": drone weight must be > 0.`;
   }
   return null;
 }
@@ -341,18 +339,6 @@ function PresetRowEditor({
           value={row.climb_rate_ms}
           onChange={field("climb_rate_ms")}
         />
-        <PresetNumField
-          label="Battery"
-          unit="Wh"
-          value={row.battery_wh}
-          onChange={field("battery_wh")}
-        />
-        <PresetNumField
-          label="Drone weight"
-          unit="kg"
-          value={row.drone_weight_kg}
-          onChange={field("drone_weight_kg")}
-        />
       </Box>
 
       {/* Optional flight config overrides */}
@@ -459,8 +445,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   default_min_agl_m: 15,
   default_max_agl_m: 80,
   default_spacing_m: 5,
-  battery_warning_pct: 90,
-  battery_error_pct: 100,
 };
 
 // ── Main panel ────────────────────────────────────────────────────────────────
@@ -524,8 +508,6 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
         name: "New Preset",
         cruise_speed_ms: 10,
         climb_rate_ms: 3,
-        battery_wh: 500,
-        drone_weight_kg: 2.0,
       },
     ]);
   }
@@ -548,11 +530,6 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
     if (settings.default_min_agl_m >= settings.default_max_agl_m) {
       setTab(0);
       setValidationError("Min AGL must be less than max AGL.");
-      return;
-    }
-    if (settings.battery_warning_pct > settings.battery_error_pct) {
-      setTab(1);
-      setValidationError("Warning % must not exceed error %.");
       return;
     }
     setSaving(true);
@@ -631,7 +608,6 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
           sx={TAB_SX}
         >
           <Tab label="Defaults" />
-          <Tab label="Warnings" />
           <Tab label="Presets" />
         </Tabs>
       </Box>
@@ -723,37 +699,8 @@ export function GlobalSettingsPanel({ open, onClose }: GlobalSettingsPanelProps)
               </Box>
             )}
 
-            {/* ── Tab 1: Safety & Warnings ── */}
+            {/* ── Tab 1: Drone Presets ── */}
             {tab === 1 && (
-              <Box>
-                <Box sx={{ mt: 1.5 }}>
-                  <SettingRow
-                    label="Battery warning"
-                    desc="Budget % that triggers an amber warning"
-                  >
-                    <NumField
-                      value={settings.battery_warning_pct}
-                      unit="%"
-                      min={0}
-                      step="1"
-                      onChange={(v) => setSetting("battery_warning_pct", v)}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Battery error" desc="Budget % that triggers a red error">
-                    <NumField
-                      value={settings.battery_error_pct}
-                      unit="%"
-                      min={0}
-                      step="1"
-                      onChange={(v) => setSetting("battery_error_pct", v)}
-                    />
-                  </SettingRow>
-                </Box>
-              </Box>
-            )}
-
-            {/* ── Tab 2: Drone Presets ── */}
-            {tab === 2 && (
               <Box>
                 {!isCustomised && (
                   <Alert

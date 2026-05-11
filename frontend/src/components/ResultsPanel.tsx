@@ -18,8 +18,6 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import BatteryChargingFullIcon from "@mui/icons-material/BatteryChargingFull";
-import BatteryAlertIcon from "@mui/icons-material/BatteryAlert";
 import TimerIcon from "@mui/icons-material/Timer";
 import ShieldIcon from "@mui/icons-material/Shield";
 import RouteIcon from "@mui/icons-material/Route";
@@ -30,7 +28,7 @@ import TuneIcon from "@mui/icons-material/Tune";
 import CameraAltIcon from "@mui/icons-material/CameraAlt";
 import JSZip from "jszip";
 import { downloadBlob } from "../api";
-import { haversineM, formatTime, getBatteryColor } from "../utils/math";
+import { haversineM, formatTime } from "../utils/math";
 import type { PlanMeta } from "../types/mission";
 import AltitudeEditorView from "./altitude-editor/AltitudeEditorView";
 
@@ -257,8 +255,6 @@ interface ResultsPanelProps {
   folder?: string | null;
   onViolationClick?: (lat: number, lon: number) => void;
   onAltitudesApplied?: (blob: Blob, meta: PlanMeta | null) => void;
-  batteryWarningPct?: number;
-  batteryErrorPct?: number;
   violationFilters?: { safety: boolean; product_poi: boolean; product_route: boolean };
   onToggleViolationCategory?: (cat: "safety" | "product_poi" | "product_route") => void;
 }
@@ -276,14 +272,11 @@ export default function ResultsPanel({
   folder,
   onViolationClick,
   onAltitudesApplied,
-  batteryWarningPct,
-  batteryErrorPct,
   violationFilters,
   onToggleViolationCategory,
 }: ResultsPanelProps) {
   const [open, setOpen] = useState({
     downloads: false,
-    warnings: false,
     profile: false,
     safety: false,
     productPoi: false,
@@ -327,7 +320,6 @@ export default function ResultsPanel({
   const scanColor =
     scanPct == null ? "#888" : scanPct >= 90 ? "#00e676" : scanPct >= 70 ? "#ff9100" : "#ff5252";
 
-  const batteryColor = getBatteryColor(meta.budget_pct, batteryWarningPct, batteryErrorPct);
   // Files that are internal plumbing — strip before handing the ZIP to the user.
   const INTERNAL_FILES = new Set([
     "meta.json",
@@ -380,12 +372,6 @@ export default function ResultsPanel({
               value: formatTime(meta.flight_time_s),
               label: "Flight time",
               color: "#00e676",
-            },
-            {
-              icon: <BatteryChargingFullIcon fontSize="small" />,
-              value: `${meta.budget_pct.toFixed(0)}%`,
-              label: "Battery",
-              color: batteryColor,
             },
             {
               icon: <ShieldIcon fontSize="small" />,
@@ -710,39 +696,6 @@ export default function ResultsPanel({
             </Box>
           )}
         </Stack>
-      )}
-
-      {meta.budget_pct > (batteryWarningPct ?? 90) && (
-        <>
-          <Button
-            size="small"
-            variant="text"
-            fullWidth
-            endIcon={open.warnings ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-            onClick={() => toggle("warnings")}
-            sx={{
-              justifyContent: "flex-start",
-              textTransform: "none",
-              color: meta.budget_pct > (batteryErrorPct ?? 100) ? "error.main" : "warning.main",
-              mb: 0.5,
-            }}
-          >
-            {meta.budget_pct > (batteryErrorPct ?? 100)
-              ? "Battery capacity exceeded"
-              : "Battery warning"}
-          </Button>
-          <Collapse in={open.warnings}>
-            {meta.budget_pct > (batteryErrorPct ?? 100) ? (
-              <Alert severity="error" sx={{ mb: 1 }} icon={<BatteryAlertIcon />}>
-                Mission exceeds battery capacity ({meta.budget_pct.toFixed(0)}%).
-              </Alert>
-            ) : (
-              <Alert severity="warning" sx={{ mb: 1 }}>
-                High battery usage ({meta.budget_pct.toFixed(0)}%). Consider reducing coverage area.
-              </Alert>
-            )}
-          </Collapse>
-        </>
       )}
 
       <Button

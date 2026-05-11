@@ -1,6 +1,6 @@
 import { Box, Stack, Tooltip, Typography } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { formatDist, formatTime, getBatteryColor } from "../../utils/math";
+import { formatDist, formatTime } from "../../utils/math";
 import type { LiveEstimates } from "../../hooks/useLiveEstimates";
 
 interface LiveEstimatesBarProps {
@@ -9,8 +9,7 @@ interface LiveEstimatesBarProps {
 
 /** Compact pre-plan rough estimate bar shown below the points list. */
 export function LiveEstimatesBar({ estimates }: LiveEstimatesBarProps) {
-  const { totalEstDistanceM, estFlightTimeSec, estBatteryPct } = estimates;
-  const batteryColor = getBatteryColor(estBatteryPct);
+  const { totalEstDistanceM, estFlightTimeSec } = estimates;
 
   return (
     <Box
@@ -70,26 +69,6 @@ export function LiveEstimatesBar({ estimates }: LiveEstimatesBarProps) {
             ~{formatTime(estFlightTimeSec)}
           </Typography>
         </Box>
-        {estBatteryPct != null && (
-          <Box>
-            <Typography
-              variant="caption"
-              color="text.disabled"
-              display="block"
-              sx={{ fontSize: "0.6rem" }}
-            >
-              Battery
-            </Typography>
-            <Typography
-              variant="caption"
-              fontFamily="monospace"
-              fontWeight={600}
-              sx={{ color: batteryColor }}
-            >
-              ~{Math.round(estBatteryPct)}%
-            </Typography>
-          </Box>
-        )}
       </Stack>
     </Box>
   );

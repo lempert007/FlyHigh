@@ -163,8 +163,7 @@ const STEP_DELAYS: number[] = [
   9800, // 14 Inserting ramp waypoints
   10800, // 15 Scanning surface clearance
   11600, // 16 Verifying AGL band compliance
-  12400, // 17 Checking battery budget
-  13200, // 18 Densifying waypoints
+  12400, // 17 Densifying waypoints
   14000, // 19 Writing waypoints.json
   14800, // 20 Generating mission_log.txt
   15600, // 21 Assembling ZIP archive

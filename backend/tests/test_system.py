@@ -28,7 +28,6 @@ async def test_full_pipeline_returns_valid_zip(client, flat_tiff):
     # Meta must have positive mission totals
     assert meta["total_distance_m"] > 0
     assert meta["flight_time_s"] > 0
-    assert meta["budget_pct"] > 0
 
 
 # ── 2. Terrain-following altitude — flat ─────────────────────────────────────
@@ -206,29 +205,7 @@ async def test_poi_outside_raster_degrades_gracefully(client, flat_tiff):
     )
 
 
-# ── 7. Battery overrun — plan always delivered ───────────────────────────────
-
-
-async def test_battery_overrun_still_returns_plan(client, flat_tiff):
-    """
-    Even when the mission exceeds 100 % battery, the planner must return a
-    complete ZIP with budget_pct > 100 in the metadata.
-    Battery exhaustion is a warning, never a blocker.
-    """
-    session_id, _ = await upload(client, ("terrain.tif", flat_tiff))
-    meta, waypoints = await plan(
-        client,
-        make_request(session_id, width_m=3000, height_m=3000, battery_wh=5),
-    )
-
-    assert meta["budget_pct"] > 100, (
-        f"Expected budget_pct > 100 for a huge mission with a 5 Wh battery, "
-        f"got {meta['budget_pct']:.1f} %"
-    )
-    assert len(waypoints) > 0, "Plan should still contain waypoints despite battery overrun"
-
-
-# ── 8. Greedy POI reorder reduces transit distance ───────────────────────────
+# ── 7. Greedy POI reorder reduces transit distance ───────────────────────────
 
 
 async def test_greedy_poi_reorder_reduces_distance(client, flat_tiff):

@@ -30,8 +30,6 @@ interface ResultsTabProps {
   onClearPlanError: () => void;
   onViolationClick?: (lat: number, lon: number) => void;
   onAltitudesApplied?: (blob: Blob, meta: PlanMeta | null) => void;
-  batteryWarningPct?: number;
-  batteryErrorPct?: number;
   violationFilters?: { safety: boolean; product_poi: boolean; product_route: boolean };
   onToggleViolationCategory?: (cat: "safety" | "product_poi" | "product_route") => void;
 }
@@ -55,8 +53,6 @@ export function ResultsTab({
   onClearPlanError,
   onViolationClick,
   onAltitudesApplied,
-  batteryWarningPct,
-  batteryErrorPct,
   violationFilters,
   onToggleViolationCategory,
 }: ResultsTabProps) {
@@ -171,8 +167,6 @@ export function ResultsTab({
           folder={folder}
           onViolationClick={onViolationClick}
           onAltitudesApplied={onAltitudesApplied}
-          batteryWarningPct={batteryWarningPct}
-          batteryErrorPct={batteryErrorPct}
           violationFilters={violationFilters}
           onToggleViolationCategory={onToggleViolationCategory}
         />

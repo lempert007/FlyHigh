@@ -36,7 +36,7 @@ export const STEPS: TutorialStep[] = [
     target: "flight-config",
     tab: 1,
     title: "4 · Flight Configuration",
-    body: "Pick a drone preset or dial in your own values: min/max AGL altitude, cruise speed, climb rate, and battery capacity. The planner uses these to build a safe, efficient 3-D route with slope and clearance guarantees.",
+    body: "Pick a drone preset or dial in your own values: min/max AGL altitude, cruise speed, and climb rate. The planner uses these to build a safe, efficient 3-D route with slope and clearance guarantees.",
   },
   {
     target: "plan-button",
@@ -48,7 +48,7 @@ export const STEPS: TutorialStep[] = [
     target: "results-panel",
     tab: 2,
     title: "6 · Review Results",
-    body: "After planning you see total distance, estimated flight time, battery usage, and any safety violations. Click a violation to fly the map straight to that spot. Download a ZIP with the waypoint JSON and full mission log.",
+    body: "After planning you see total distance, estimated flight time, and any safety violations. Click a violation to fly the map straight to that spot. Download a ZIP with the waypoint JSON and full mission log.",
   },
   {
     target: "flight-preview",

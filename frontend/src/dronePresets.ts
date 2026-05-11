@@ -3,10 +3,7 @@ import type { FlightConfig } from "./types/mission";
 export interface DronePreset {
   label: string;
   description: string;
-  config: Pick<
-    FlightConfig,
-    "cruise_speed_ms" | "climb_rate_ms" | "battery_wh" | "drone_weight_kg"
-  > &
+  config: Pick<FlightConfig, "cruise_speed_ms" | "climb_rate_ms"> &
     Partial<
       Pick<
         FlightConfig,
@@ -27,8 +24,6 @@ export const DRONE_PRESETS: DronePreset[] = [
     config: {
       cruise_speed_ms: 10,
       climb_rate_ms: 3,
-      battery_wh: 600,
-      drone_weight_kg: 6,
     },
   },
   {
@@ -37,8 +32,6 @@ export const DRONE_PRESETS: DronePreset[] = [
     config: {
       cruise_speed_ms: 15,
       climb_rate_ms: 6,
-      battery_wh: 1550,
-      drone_weight_kg: 2.5,
     },
   },
   {
@@ -47,8 +40,6 @@ export const DRONE_PRESETS: DronePreset[] = [
     config: {
       cruise_speed_ms: 25,
       climb_rate_ms: 4,
-      battery_wh: 300,
-      drone_weight_kg: 1.5,
     },
   },
 ];
@@ -61,8 +52,6 @@ export const DEFAULT_CONFIG: FlightConfig = {
   cruise_speed_ms: 10,
   climb_rate_ms: 2,
   spacing_m: 10,
-  battery_wh: 600,
-  drone_weight_kg: 7,
   smart_route: false,
   smart_route_corridor_m: 50,
   optimize_poi_order: false,

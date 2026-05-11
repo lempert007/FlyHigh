@@ -104,10 +104,6 @@ def _clearance_color(m: float | None) -> tuple:
     return _SUCCESS if m > 15 else _WARNING if m > 5 else _DANGER
 
 
-def _battery_color(pct: float) -> tuple:
-    return _SUCCESS if pct < 70 else _WARNING if pct < 90 else _DANGER
-
-
 _KIND_LABEL: dict[str, str] = {
     "terrain_band": "Terrain band too narrow",
     "slope": "Slope limit exceeded",
@@ -610,7 +606,6 @@ def _summary_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
         [
             ("Total distance", _fmt_dist(m.total_distance_m), _PRIMARY),
             ("Flight time", _fmt_time(m.flight_time_s), (0, 168, 150)),
-            ("Battery usage", f"{m.budget_pct:.1f}%", _battery_color(m.budget_pct)),
             (
                 "Min clearance",
                 f"{m.min_clearance_m:.0f} m" if m.min_clearance_m is not None else "\u2014",
@@ -633,7 +628,6 @@ def _summary_page_body(pdf: MissionPDF, data: LastPlanData) -> None:
             ("Terrain res.", terrain_res),
             ("Violations", str(len(m.violations or []))),
             ("Tight segs", str(m.tight_segment_count or 0)),
-            ("Energy", f"{m.energy_wh:.1f} Wh"),
         ]
     )
 
@@ -830,8 +824,6 @@ def _config_page_body(
         ("Cruise speed", f"{fc.cruise_speed_ms} m/s"),
         ("Climb rate", f"{fc.climb_rate_ms} m/s"),
         ("Route spacing", f"{fc.spacing_m} m"),
-        ("Battery capacity", f"{fc.battery_wh} Wh"),
-        ("Drone weight", f"{fc.drone_weight_kg} kg"),
         ("Optimize POI order", "Yes" if fc.optimize_poi_order else "No"),
         ("Smart Route", "Yes" if fc.smart_route else "No"),
         ("Min altitude step", f"{fc.min_altitude_step_m} m"),

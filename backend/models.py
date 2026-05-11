@@ -145,17 +145,6 @@ class FlightConfig(BaseModel):
         gt=0,
         description="Route point spacing in metres",
     )
-    battery_wh: float = Field(
-        default=config.DEFAULT_BATTERY_WH,
-        gt=0,
-        description="Total usable battery capacity in Watt-hours",
-    )
-    drone_weight_kg: float = Field(
-        default=config.DEFAULT_DRONE_WEIGHT_KG,
-        gt=0,
-        description="All-up drone mass in kilograms",
-    )
-
     smart_route: bool = Field(
         default=False,
         description="Enable Smart Route lateral path optimisation — shifts transit segments "
@@ -273,8 +262,6 @@ class ViolationInfo(BaseModel):
 class PlanMeta(BaseModel):
     total_distance_m: float
     flight_time_s: float
-    energy_wh: float
-    budget_pct: float
     violations: list[ViolationInfo] = Field(default_factory=list)
     warning: str | None = None
     error: str | None = None
@@ -286,12 +273,7 @@ class PlanMeta(BaseModel):
     tight_segment_count: int | None = None
     min_agl_m: float | None = None
     max_agl_m: float | None = None
-    poi_scan_good_pct: float | None = (
-        None  # % of POI scan points within product spec; None when no POIs
-    )
-    rth_reserve_pct: float | None = None
-    """Estimated emergency RTH energy as % of total battery (straight-line from furthest waypoint).
-    None when the route has no waypoints. High values indicate limited abort margin."""
+    poi_scan_good_pct: float | None = None
 
 
 # ── Mission library ───────────────────────────────────────────────────────────
@@ -346,8 +328,6 @@ class PresetItem(BaseModel):
     name: str = Field(..., min_length=1, description="Unique human-readable preset name")
     cruise_speed_ms: float = Field(..., gt=0)
     climb_rate_ms: float = Field(..., gt=0)
-    battery_wh: float = Field(..., gt=0)
-    drone_weight_kg: float = Field(..., gt=0)
     # Optional flight config overrides — None means "don't override, use global default"
     min_agl_m: float | None = Field(default=None, gt=0)
     max_agl_m: float | None = Field(default=None, gt=0)
@@ -408,26 +388,11 @@ class AppSettings(BaseModel):
         gt=0,
         description="Default route point spacing for new missions (metres)",
     )
-    # Safety & warning thresholds
-    battery_warning_pct: float = Field(
-        default=config.BATTERY_WARNING_PCT,
-        ge=0,
-        le=200,
-        description="Budget % above which an amber battery warning is shown",
-    )
-    battery_error_pct: float = Field(
-        default=config.BATTERY_ERROR_PCT,
-        ge=0,
-        le=200,
-        description="Budget % above which a red battery error is shown",
-    )
 
     @model_validator(mode="after")
     def check_agl_constraints(self) -> AppSettings:
         if self.default_min_agl_m >= self.default_max_agl_m:
             raise ValueError("default_min_agl_m must be strictly less than default_max_agl_m")
-        if self.battery_warning_pct > self.battery_error_pct:
-            raise ValueError("battery_warning_pct must not exceed battery_error_pct")
         return self
 
 

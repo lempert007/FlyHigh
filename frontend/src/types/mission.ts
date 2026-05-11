@@ -72,8 +72,6 @@ export interface FlightConfig {
   cruise_speed_ms: number;
   climb_rate_ms: number;
   spacing_m: number;
-  battery_wh: number;
-  drone_weight_kg: number;
   smart_route: boolean;
   smart_route_corridor_m: number;
   optimize_poi_order: boolean;
@@ -126,9 +124,7 @@ export interface Violation {
 export interface PlanMeta {
   total_distance_m: number;
   flight_time_s: number;
-  budget_pct: number;
   violations: Violation[];
-  energy_wh?: number;
   covered_area_m2?: number;
   terrain_resolution_m?: number;
   smart_route_summary?: string;
@@ -140,7 +136,6 @@ export interface PlanMeta {
   min_agl_m?: number;
   max_agl_m?: number;
   poi_scan_good_pct?: number;
-  rth_reserve_pct?: number;
 }
 
 export interface ProfilePoint {
@@ -195,8 +190,6 @@ export interface PresetItem {
   name: string;
   cruise_speed_ms: number;
   climb_rate_ms: number;
-  battery_wh: number;
-  drone_weight_kg: number;
   // Optional flight config overrides
   min_agl_m?: number | null;
   max_agl_m?: number | null;
@@ -240,8 +233,6 @@ export interface AppSettings {
   default_min_agl_m: number;
   default_max_agl_m: number;
   default_spacing_m: number;
-  battery_warning_pct: number;
-  battery_error_pct: number;
 }
 
 export interface RouteFileEnvelope {

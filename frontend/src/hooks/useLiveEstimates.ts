@@ -1,13 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import type { LatLon, Waypoint, Poi, FlightConfig } from "../types/mission";
-import { haversineM, estimatePowerW } from "../utils/math";
+import { haversineM } from "../utils/math";
 import { LIVE_ESTIMATE_DEBOUNCE_MS } from "../constants";
 
 export interface LiveEstimates {
   totalEstDistanceM: number;
   estFlightTimeSec: number;
-  /** null when battery_wh is 0 */
-  estBatteryPct: number | null;
 }
 
 /** Approximate sweep distance for a single POI (no terrain, no zone effects). */
@@ -75,14 +73,7 @@ export function useLiveEstimates(
       const speed = config.cruise_speed_ms > 0 ? config.cruise_speed_ms : 8;
       const estFlightTimeSec = totalEstDistanceM / speed;
 
-      let estBatteryPct: number | null = null;
-      if (config.battery_wh > 0) {
-        const powerW = estimatePowerW(speed, config.drone_weight_kg);
-        const energyWh = (powerW * estFlightTimeSec) / 3600;
-        estBatteryPct = (energyWh / config.battery_wh) * 100;
-      }
-
-      setEstimates({ totalEstDistanceM, estFlightTimeSec, estBatteryPct });
+      setEstimates({ totalEstDistanceM, estFlightTimeSec });
     }, LIVE_ESTIMATE_DEBOUNCE_MS);
 
     return () => {
