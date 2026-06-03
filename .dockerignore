@@ -1,0 +1,19 @@
+.git
+.vscode
+.claude
+*.tar.gz
+.DS_Store
+**/.DS_Store
+
+# Backend — exclude large data files and local-only config
+backend/.venv
+backend/.env
+backend/maps
+backend/missions
+backend/__pycache__
+backend/**/__pycache__
+backend/**/*.pyc
+
+# Frontend — exclude installed modules and previous builds
+frontend/node_modules
+frontend/dist

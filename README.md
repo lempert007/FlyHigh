@@ -32,6 +32,76 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
+## Docker / Offline Deployment
+
+Use this when running FlyHigh on an air-gapped machine. All dependencies are baked into the images at build time — no internet access needed at runtime.
+
+### Prerequisites
+
+- Docker + Docker Compose on both machines
+- Your offline tile server URL (e.g. `http://host.docker.internal:8888`)
+
+### Build (internet-connected machine)
+
+```bash
+cp .env.docker .env
+# Edit TILE_SERVER_URL in .env to point at your tile server
+./build.sh --export        # builds images and saves to flyhigh.tar.gz
+```
+
+### Deploy (offline machine)
+
+```bash
+# 1. Load images
+docker load < flyhigh.tar.gz
+
+# 2. Copy these files from the source machine:
+#    docker-compose.yml  .env.docker  backend/maps/dtm.tif
+
+# 3. Prepare data directories
+mkdir -p maps missions
+cp /path/to/dtm.tif maps/
+
+# 4. Configure
+cp .env.docker .env
+# Edit TILE_SERVER_URL in .env
+
+# 5. Start
+docker compose --env-file .env up -d
+```
+
+Open `http://localhost:3000` (or the port you set in `.env`).
+
+### Configuration (`.env`)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `TILE_SERVER_URL` | *(required)* | Full tile URL template, e.g. `http://192.168.1.100:8888/tiles/{z}/{x}/{y}.png` — must be reachable from the browser |
+| `FRONTEND_PORT` | `3000` | Host port the app is served on |
+| `MAPS_PATH` | `./maps` | Host path to the folder containing `dtm.tif` |
+| `MISSIONS_PATH` | `./missions` | Host path for saved mission data (persisted across restarts) |
+
+### How it works
+
+```
+Browser → nginx:80 (frontend container)
+           ├── /tiles/*          → your tile server (TILE_SERVER_URL)
+           ├── /plan, /missions… → backend:8000 (FastAPI container)
+           └── everything else   → React SPA
+```
+
+The frontend is compiled with empty `VITE_API_URL` so all API calls are relative — nginx is the single entry point.
+
+On the target machine:
+  docker pull flyhigh12/flyhigh-backend:latest
+  docker pull flyhigh12/flyhigh-frontend:latest
+  docker tag  flyhigh12/flyhigh-backend:latest  flyhigh-backend
+  docker tag  flyhigh12/flyhigh-frontend:latest flyhigh-frontend
+  cp .env.docker .env  # edit TILE_SERVER_URL
+  mkdir -p maps missions && cp /path/to/dtm.tif maps/
+  docker compose --env-file .env up -d
+---
+
 ## How to Use It
 
 **Step 1 — Create or open a mission**

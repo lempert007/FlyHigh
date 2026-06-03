@@ -1,0 +1,21 @@
+server {
+    listen 80;
+    server_name _;
+
+    # Backend API routes
+    location ~ ^/(tiffs|missions|upload|plan|altitude-edit|editor-data|pdf|terrain|system-config|preview-strip-spacing|preview|dashboard|presets|settings|health|elevation-image|elevation-point)(/|$) {
+        proxy_pass http://backend:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 120s;
+        # Allow large file uploads (GeoTIFF, plan ZIPs)
+        client_max_body_size 512m;
+    }
+
+    # React SPA — serve index.html for all unmatched routes
+    location / {
+        root /usr/share/nginx/html;
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -20,9 +20,9 @@ export function SystemConfigProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     fetch("/system-config")
       .then((r) => r.json())
-      .then((data: { offline_maps: boolean }) => {
+      .then((data: { offline_maps: boolean; tile_url?: string | null }) => {
         setConfig({
-          tileUrl: data.offline_maps ? TILE_URL_OFFLINE : TILE_URL_ONLINE,
+          tileUrl: data.offline_maps ? (data.tile_url ?? TILE_URL_OFFLINE) : TILE_URL_ONLINE,
           tileAttribution: TILE_ATTRIBUTION,
         });
       })

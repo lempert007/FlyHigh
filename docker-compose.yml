@@ -1,0 +1,27 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: flyhigh-backend
+    restart: unless-stopped
+    volumes:
+      - ${MAPS_PATH:-./maps}:/app/maps:ro
+      - ${MISSIONS_PATH:-./missions}:/app/missions
+    environment:
+      # Full tile URL template — setting this activates offline mode automatically
+      - TILE_URL_OFFLINE=${TILE_SERVER_URL}
+    extra_hosts:
+      # Allows backend to reach services running on the host machine
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    image: flyhigh-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      - backend

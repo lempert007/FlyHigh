@@ -121,16 +121,12 @@ SESSION_PRUNE_INTERVAL_S: int = 300
 """How often (seconds) the background task sweeps for and removes expired sessions."""
 
 # ── Map tiles ─────────────────────────────────────────────────────────────────
-OFFLINE_MAPS: bool = False
-"""When True, tiles are served from the local MBTiles file (backend/maps/tiles.mbtiles)
-and no internet connection is required. When False, tiles are fetched live from
-OpenStreetMap. Change this constant before launching the server."""
+TILE_URL_OFFLINE: str = _os.getenv("TILE_URL_OFFLINE", "")
+"""Full tile URL template for offline deployments (e.g. http://192.168.1.100:8888/tiles/{z}/{x}/{y}.png).
+Set via TILE_URL_OFFLINE env var. When set, offline mode is active automatically."""
 
-TILE_URL_OFFLINE: str = _os.getenv(
-    "TILE_URL_OFFLINE", "http://localhost:8000/tiles/{z}/{x}/{y}.png"
-)
-"""Tile URL used when OFFLINE_MAPS is True — points at the local FastAPI tile server.
-Override via TILE_URL_OFFLINE env var in production."""
+OFFLINE_MAPS: bool = bool(TILE_URL_OFFLINE)
+"""True when TILE_URL_OFFLINE is set — derived automatically, no separate flag needed."""
 
 TILE_URL_ONLINE: str = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
 """Tile URL used when OFFLINE_MAPS is False — live OpenStreetMap CDN."""

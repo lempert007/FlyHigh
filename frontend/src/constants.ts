@@ -1,7 +1,7 @@
 /** Centralised constants — all magic numbers live here. */
 
 /** Tile URL used when the backend is configured with OFFLINE_MAPS = True. */
-const _apiUrl = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const _apiUrl = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 export const TILE_URL_OFFLINE = `${_apiUrl}/tiles/{z}/{x}/{y}.png`;
 
 /** Tile URL used when the backend is configured with OFFLINE_MAPS = False. */

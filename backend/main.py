@@ -98,4 +98,7 @@ def health() -> dict:
 @app.get("/system-config")
 def system_config() -> dict:
     """Expose deployment-time configuration to the frontend."""
-    return {"offline_maps": config.OFFLINE_MAPS}
+    return {
+        "offline_maps": config.OFFLINE_MAPS,
+        "tile_url": config.TILE_URL_OFFLINE if config.OFFLINE_MAPS else None,
+    }
